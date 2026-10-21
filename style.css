@@ -34,3 +34,10 @@
 .actions{grid-template-columns:repeat(3,minmax(0,1fr))}.item{min-width:0}
 .overlay{padding-top:64px;padding-bottom:28px}
 @media(max-width:350px){header{padding-left:16px;padding-right:16px}.nerves{max-width:128px}.hours{gap:8px;font-size:9px}.brand{font-size:9px}.card{padding-left:18px;padding-right:18px}}
+
+/* На компактном экране оставляем место над причёской даже при покачивании.
+   Пузырь привязан к персонажам снизу, а не к высоте окна браузера. */
+@media (max-width:480px), (max-height:740px) {
+  .room { min-height:345px; }
+  .thought { top:auto; bottom:242px; }
+}
