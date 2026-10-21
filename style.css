@@ -23,3 +23,14 @@
 @keyframes bubbling{0%{transform:translateY(0) scale(.6);opacity:.3}50%{opacity:1}100%{transform:translateY(-45px) scale(1.1);opacity:0}}
 @media(max-width:350px){.clock-controls{gap:5px}.pause-button{width:40px;height:44px}.nerves .label{font-size:10px}#hearts{font-size:22px}}
 @media(prefers-reduced-motion:reduce){.heart-hit{color:#e2d8d0}.sleep-letters,.water-bubbles{opacity:1}}
+
+/* Общий переключатель остаётся доступным поверх стартового, паузы и итогов. */
+.language-switch{position:fixed;top:max(10px,env(safe-area-inset-top));right:max(12px,calc((100vw - 480px)/2 + 12px));z-index:30;display:flex;align-items:center;background:#fffcf5;border:1px solid #e9dfd2;border-radius:15px;box-shadow:0 3px 8px #66564a12;padding:2px;color:#b7a797}
+.language-switch button{border:0;border-radius:11px;background:transparent;color:#968477;min-width:44px;min-height:40px;font-size:12px;font-weight:700;padding:7px}
+.language-switch button[aria-pressed="true"]{background:#8fa38a;color:#fff}
+.brand{padding-right:110px;min-height:34px;letter-spacing:1.7px}
+.primary > span[data-i18n]{float:none}
+.primary,.secondary,.item strong,.item small,.card p,.card h2{overflow-wrap:anywhere}
+.actions{grid-template-columns:repeat(3,minmax(0,1fr))}.item{min-width:0}
+.overlay{padding-top:64px;padding-bottom:28px}
+@media(max-width:350px){header{padding-left:16px;padding-right:16px}.nerves{max-width:128px}.hours{gap:8px;font-size:9px}.brand{font-size:9px}.card{padding-left:18px;padding-right:18px}}
