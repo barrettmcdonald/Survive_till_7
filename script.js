@@ -6,6 +6,8 @@ const TOTAL_HOURS = 12;
 // Централизованные тексты. Модель хранит ключи, а не переведённые сообщения.
 const TRANSLATIONS = {
   "ru": {
+    "gameName": "Дожить до 7",
+    "gameTitleHtml": "Дожить<br>до <em>7</em>",
     "brand": "ОДИН ОЧЕНЬ ДЛИННЫЙ ДЕНЬ",
     "time": "Время",
     "nerves": "Мамины нервные клетки",
@@ -83,6 +85,8 @@ const TRANSLATIONS = {
     "unlocked": "Второй уровень открыт! Новое приключение ждёт."
   },
   "en": {
+    "gameName": "Survive till 7",
+    "gameTitleHtml": "Survive<br>till <em>7</em>",
     "brand": "ONE VERY LONG DAY",
     "time": "Time",
     "nerves": "Mom’s last nerves",
@@ -201,6 +205,7 @@ class GameModel {
     this.timeoutApplied = false; this.action = null; this.actionStarted = 0; this.actionEnd = Infinity;
     this.losses = []; this.lastNeedAction = null; this.needStreak = 0;
     this.seenNeeds = new Set();
+    this.queuedNeed = null; this.needShownAt = 0; this.dayEnded = false;
   }
   start(levelId = this.levelId) {
     if (!Object.hasOwn(LEVELS, levelId)) throw new RangeError('Unknown level');
@@ -215,15 +220,25 @@ class GameModel {
     // Оставляем случайный выбор, но резервируем последние часы для
     // ещё не встречавшихся действий. В новой партии список очищается.
     const choices = unseen.length >= TOTAL_HOURS - hour ? unseen : eligible;
-    this.need = choices[Math.floor(this.random() * choices.length)];
-    this.seenNeeds.add(this.need.action);
-    this.needStreak = this.need.action === this.lastNeedAction ? this.needStreak + 1 : 1;
-    this.lastNeedAction = this.need.action;
-    this.pending = true; this.timeoutApplied = false; this.action = null; this.actionEnd = Infinity;
+    const need = choices[Math.floor(this.random() * choices.length)];
+    this.seenNeeds.add(need.action);
+    this.needStreak = need.action === this.lastNeedAction ? this.needStreak + 1 : 1;
+    this.lastNeedAction = need.action;
+    if (this.action) { this.queuedNeed = need; return; }
+    this.showNeed(need);
+  }
+  showNeed(need) {
+    this.need = need; this.queuedNeed = null;
+    this.needShownAt = this.elapsed;
+    this.pending = true; this.timeoutApplied = false;
     this.feedback = 'react'; this.mood = '';
   }
+  win() {
+    this.status = 'won'; this.pending = false; this.need = null; this.queuedNeed = null;
+    this.action = null; this.actionEnd = Infinity; this.mood = 'happy';
+  }
   fail(late) {
-    if (this.status !== 'playing' || !this.pending) return;
+    if (this.status !== 'playing' || !this.pending || this.action) return;
     if (late) { if (this.timeoutApplied) return; this.timeoutApplied = true; }
     this.hearts--; this.losses.push({ index: this.hearts, at: this.elapsed }); this.mood = 'crying';
     this.feedback = late ? 'late' : 'wrong';
@@ -234,20 +249,25 @@ class GameModel {
     const target = Math.max(this.elapsed, elapsed);
     // Единственная шкала времени. Границы обрабатываются по порядку, без setTimeout.
     while (this.status === 'playing') {
-      const hourAt = (this.hour + 1) * HOUR_MS;
-      const timeoutAt = this.pending && !this.timeoutApplied ? this.hour * HOUR_MS + RESPONSE_MS : Infinity;
+      const hourAt = this.dayEnded ? Infinity : (this.hour + 1) * HOUR_MS;
+      const timeoutAt = this.pending && !this.timeoutApplied ? this.needShownAt + RESPONSE_MS : Infinity;
       const next = Math.min(hourAt, timeoutAt, this.actionEnd);
       if (next > target) { this.elapsed = target; break; }
       this.elapsed = next;
-      // При совпадении границ новый час всегда важнее старого действия.
+      // На границе часа сохраняем действие; показ новой потребности ждёт его конца.
       if (next === hourAt) {
         if (this.hour + 1 === TOTAL_HOURS) {
-          this.status = 'won'; this.pending = false; this.need = null; this.action = null;
-          this.actionEnd = Infinity; this.mood = 'happy'; break;
+          this.dayEnded = true; this.pending = false; this.queuedNeed = null;
+          if (!this.action) { this.win(); break; }
+          continue;
         }
         this.newHour(this.hour + 1);
       } else if (next === timeoutAt) { this.fail(true); }
-      else { this.action = null; this.actionEnd = Infinity; this.mood = ''; this.feedback = 'calm'; }
+      else {
+        this.action = null; this.actionEnd = Infinity; this.mood = ''; this.feedback = 'calm';
+        if (this.dayEnded) this.win();
+        else if (this.queuedNeed) this.showNeed(this.queuedNeed);
+      }
     }
   }
   answer(action, elapsed) {
@@ -309,7 +329,7 @@ function render() {
   $('pause-overlay').hidden = !gameClock.paused || model.status !== 'playing';
   $('need-icon').textContent = model.pending ? model.need.icon : '♡';
   $('need-text').textContent = model.pending ? t(model.need.text) : t('helping');
-  $('reaction-progress').style.width = model.pending && !model.timeoutApplied ? Math.max(0, 100 * (1 - (model.elapsed - model.hour * HOUR_MS) / RESPONSE_MS)) + '%' : '0%';
+  $('reaction-progress').style.width = model.pending && !model.timeoutApplied ? Math.max(0, 100 * (1 - (model.elapsed - model.needShownAt) / RESPONSE_MS)) + '%' : '0%';
   $('message').textContent = t(model.feedback);
   buttons.forEach(button => {
     const available = LEVELS[model.levelId].objects.includes(button.dataset.action);
@@ -570,7 +590,7 @@ function updateLocalizedState() {
   $('level-indicator').textContent = t(LEVELS[model.levelId].name);
   updateLevelCards();
   if (model.status === 'ready') {
-    $('screen-title').innerHTML = 'Survive<br>till <em>7</em>';
+    $('screen-title').innerHTML = t('gameTitleHtml');
     $('screen-icon').textContent = '☀';
     $('screen-description').textContent = t('intro');
     $('instructions').hidden = false;
@@ -586,6 +606,7 @@ function updateLocalizedState() {
 }
 function applyLanguage() {
   document.documentElement.lang = language;
+  document.title = t('gameName');
   document.querySelectorAll('[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
   document.querySelectorAll('[data-i18n-aria]').forEach(element => { element.setAttribute('aria-label', t(element.dataset.i18nAria)); });
   document.querySelectorAll('[data-i18n-title]').forEach(element => { element.title = t(element.dataset.i18nTitle); });
