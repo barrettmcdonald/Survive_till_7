@@ -47,7 +47,7 @@
 .illustrated-room{height:auto;min-height:0;aspect-ratio:1024/1211;border:0;background:#f2d6b9;position:relative;isolation:isolate;overflow:hidden}
 .room-art,.table-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.room-art{z-index:0}.table-layer{z-index:5}
 .illustrated-room .family{left:28%;top:25%;bottom:auto;width:46%;height:auto;aspect-ratio:1214/1295;transform:none;animation:none;z-index:4;pointer-events:none;will-change:left,top}
-.family-visual{position:absolute;inset:0;transform-origin:50% 95%}.family-seated,.family-standing{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;user-select:none}.family-standing{opacity:0}.family-seated{animation:illustrated-breathe 3s ease-in-out infinite}
+.family-visual{position:absolute;inset:0;transform-origin:50% 95%}.family-seated,.family-standing{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;user-select:none}.family-standing{opacity:0}.family-seated,.family-crying{animation:illustrated-breathe 3s ease-in-out infinite}
 @keyframes illustrated-breathe{50%{transform:translateY(-2px) rotate(.35deg)}}
 .illustrated-room .thought{top:6%;bottom:auto;left:60%;width:36%;min-height:72px;border-radius:50%;padding:9px 12px 12px;box-shadow:none;z-index:7;background:#fffcf3;pointer-events:none;transform:translateX(-50%)}
 .illustrated-room .thought:after{width:13px;height:13px;right:36%;bottom:-18px}.illustrated-room .thought:before{width:7px;height:7px;right:44%;bottom:-31px}.illustrated-room #need-icon{font-size:26px;height:31px}.illustrated-room #need-text{font-size:clamp(11px,2.9vw,14px);line-height:1.2;display:block}.illustrated-room .reaction-track{height:3px;margin-top:6px}.illustrated-room .reaction-track{background:#efe5d7}.illustrated-room #reaction-progress{background:#96b19b}
@@ -57,7 +57,7 @@
 .emotion-tears{display:none;position:absolute;left:69%;top:58%;z-index:6}.crying .emotion-tears{display:block}.emotion-tears i{position:absolute;width:5px;height:9px;background:#9dcedb;border-radius:50% 0 50% 50%;animation:tear .7s infinite}.emotion-tears i:nth-child(2){left:17px;top:8px;animation-delay:-.35s}
 .illustrated-room .dad{right:22%;bottom:31%;z-index:9;font-size:45px}.message{min-height:46px;background:#fcf7ef;font-size:12px;line-height:1.4;padding:9px 18px}footer{background:#fcf7ef;padding:4px 18px 14px;justify-content:center}
 @media(max-width:350px){header{padding:12px 15px 10px}.brand{font-size:8px}.nerves{max-width:135px}.nerves .label{font-size:10px}#hearts{font-size:22px}.illustrated-room .thought{width:39%;left:61%;min-height:70px;padding:7px 8px 10px}.illustrated-room #need-icon{height:28px;font-size:24px}}
-@media(prefers-reduced-motion:reduce){.family-seated{animation:none}.scene-item{transition:none}}
+@media(prefers-reduced-motion:reduce){.family-seated,.family-crying{animation:none}.scene-item{transition:none}}
 
 /* Белые полоски на тёплой жёлтой кнопке, как в референсе. */
 .pause-button{font-size:0}.pause-button:before{content:"";display:block;width:5px;height:17px;background:#fff9ee;border-radius:2px;box-shadow:9px 0 #fff9ee;margin:auto;transform:translateX(-4px)}
@@ -94,11 +94,22 @@ header{padding:7px 16px 8px;border-radius:0 0 18px 18px}.brand{min-height:35px;m
 
 /* Специальные позы: плач и руки над чашей раковины. */
 .family-crying,.family-washing{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;opacity:0;transform-origin:50% 96%;pointer-events:none}
+.family-crying{clip-path:ellipse(10.4% 8.6% at 72.4% 56.7%)}
 .table-bottle{transform:rotate(-6deg);transform-origin:50% 90%}
 .emotion-tears{left:0;top:0;width:100%;height:100%;z-index:9;pointer-events:none}
 .emotion-tears i,.emotion-tears i:nth-child(2){left:65%;top:55%;width:clamp(6px,2vw,9px);height:clamp(12px,4vw,19px);background:linear-gradient(135deg,#dcfaff,#67bddf);border-radius:0 60% 60% 60%;box-shadow:inset 1px 1px 0 #eefcff;animation:big-cry-tear 650ms ease-in infinite}
 .emotion-tears i:nth-child(2){left:77%;top:61%;animation-delay:-.325s}
 .emotion-tears i:after{content:'';position:absolute;width:60%;height:60%;left:0;top:-8px;background:#a2e1f1;border-radius:0 60% 60% 60%}
 @keyframes big-cry-tear{0%{transform:translate(0,0) rotate(30deg) scale(.55);opacity:.7}30%{opacity:1}100%{transform:translate(3px,25px) rotate(30deg) scale(1.1);opacity:0}}
-#main-menu{font-size:13px;color:#8a796a;background:#fffaf1}
+#main-menu{font-size:14px;color:#8a796a;background:#fffaf1}
 @media(prefers-reduced-motion:reduce){.crying .emotion-tears i{opacity:.9;transform:rotate(30deg)}}
+
+/* Уровни дополняют прежний интерфейс; сцена первого уровня не меняется. */
+#overlay,#levels-overlay{position:fixed;overflow-y:auto;align-items:flex-start}#overlay>.card,#levels-overlay>.card{margin:auto 0}#next-level{margin-top:10px}#result-menu{font-size:12px}.levels-overlay{z-index:18}.levels-card{max-width:400px}.levels-card h2{font:normal 29px Georgia,serif;color:#6b7160;margin:10px 0 20px}.level-card{display:grid;grid-template-columns:34px minmax(0,1fr);gap:6px 10px;width:100%;padding:16px 12px;margin:12px 0;border:2px solid #e7dfd1;border-radius:18px;background:#faf6ed;color:#66564a;text-align:left}.level-card strong{font-size:14px;line-height:1.35}.level-card>span:not(.level-number){grid-column:2;font-size:12px;line-height:1.5;color:#968477}.level-card small{grid-column:2;font-size:11px;color:#839a7e}.level-number{grid-row:1/4;align-self:center;width:32px;height:32px;line-height:32px;border-radius:50%;background:#dce6d5;text-align:center;font-weight:bold}.level-card:disabled{cursor:default;background:#f1ebe4;border-style:dashed;opacity:.8}.level-card:disabled small{color:#a78f7a}.level-card:not(:disabled):hover{border-color:#91a98a;background:#f1f6ec}#level-indicator{font-size:8px;color:#8a796a;white-space:nowrap}footer{gap:10px}
+.toys-target{left:58%;top:50%;width:40%;height:20%;z-index:3;border-radius:50%}.toys-target>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none}.toys-target .touch-marker{left:62%;top:55%}.toys-target .item-caption{top:76%;z-index:1}.family-playing{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;opacity:0;transform-origin:55% 90%;pointer-events:none}.play-baby{position:absolute;z-index:8;left:61%;top:54%;width:28%;aspect-ratio:3/2;object-fit:contain;opacity:0;pointer-events:none;transform-origin:50% 50%;user-select:none}
+.illustrated-room[data-level="1"] .family-playing,.illustrated-room[data-level="1"] .play-baby{display:none}
+@media(max-height:650px){#overlay,#levels-overlay{padding-top:55px;padding-bottom:16px}#overlay .card{padding:16px 20px}#overlay .eyebrow{font-size:7px}#overlay .screen-icon{font-size:26px}#overlay h1{font-size:44px;margin:10px 0 12px}#overlay #screen-description{font-size:12px;line-height:1.5}#overlay .instructions{margin:10px 0;padding:8px 12px;font-size:12px}#overlay .instructions small{font-size:10px;line-height:1.5;margin-top:8px}#overlay .primary,#overlay .secondary{padding:11px 16px}#overlay .secondary{margin-top:8px}#overlay .card-note{font-size:9px}footer{flex-wrap:wrap;gap:3px 8px}}
+
+
+
+.growing-care-bottle{position:absolute;width:7%;aspect-ratio:1241/1268;object-fit:contain;transform:rotate(-50deg);opacity:0;pointer-events:none;z-index:9}

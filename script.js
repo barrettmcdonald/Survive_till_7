@@ -35,14 +35,14 @@ const TRANSLATIONS = {
     "bottleLower": "бутылочка",
     "cribLower": "кроватка",
     "instructions": "Реагируй быстро, береги мамины нервы и продержись до возвращения папы!",
-    "start": "Начать день",
+    "start": "Начать игру",
     "startNote": "До семи вечера. Ты справишься ♡",
     "pause": "Пауза",
     "break": "Мама заслужила передышку!",
     "resume": "Продолжить",
-    "mainMenu": "На начальный экран",
+    "mainMenu": "Меню",
     "restart": "Начать сначала",
-    "confirm": "Начать новую игру?",
+    "confirm": "Начать уровень сначала?",
     "cancel": "Отмена",
     "yes": "Да, начать",
     "needWash": "Я покакал!",
@@ -55,14 +55,32 @@ const TRANSLATIONS = {
     "late": "Время вышло. −1 сердечко. Малышу всё ещё нужна помощь!",
     "wrong": "Нужен другой предмет! −1 сердечко. Попробуй ещё.",
     "calm": "Малыш спокоен. Можно немного выдохнуть.",
-    "helping": "Помогаем малышу…",
+    "helping": "",
     "wonTitle": "19:00. Папа дома!",
     "lostTitle": "Маме нужен отдых",
     "wonDescription": "Вы справились! Малыш передан папе. У мамы осталось сердечек: {count}. Теперь — чай и тишина.",
     "lostDescription": "Все пять нервных клеток устали. Этот день был непростым. Сделаем вдох и попробуем ещё раз?",
     "wonNote": "Даже самый длинный день заканчивается.",
     "lostNote": "Подсказка: следи за пузырём над малышом.",
-    "language": "Язык"
+    "language": "Язык",
+    "levels": "Уровни",
+    "selectLevel": "Выбор уровня",
+    "level1Name": "Новорождённый",
+    "level2Name": "Малыш подрос",
+    "level1Card": "Уровень 1 — Новорождённый",
+    "level2Card": "Уровень 2 — Малыш подрос",
+    "level1Description": "Первый день вдвоём. Кормим, моем и укладываем спать.",
+    "level2Description": "Малыш стал активнее! Он ещё не сидит и не ходит, но уже тянется к игрушкам. К прежним заботам добавилась игра.",
+    "locked": "Пройди первый уровень",
+    "available": "Можно играть",
+    "back": "В главное меню",
+    "nextLevel": "Следующий уровень",
+    "needPlay": "Хочу играть!",
+    "successPlay": "Погремушка звенит, малыш смеётся — мама тоже!",
+    "toys": "Игрушки",
+    "playHint": "Поиграть с малышом",
+    "wonLevel2": "Ещё один день позади! Малыш наигрался, папа дома. У мамы осталось сердечек: {count}.",
+    "unlocked": "Второй уровень открыт! Новое приключение ждёт."
   },
   "en": {
     "brand": "ONE VERY LONG DAY",
@@ -94,14 +112,14 @@ const TRANSLATIONS = {
     "bottleLower": "bottle",
     "cribLower": "crib",
     "instructions": "Think fast, save Mom’s nerves, and hang in there until Dad gets home!",
-    "start": "Start the day",
+    "start": "Start Game",
     "startNote": "Until seven tonight. You’ve got this ♡",
     "pause": "Paused",
     "break": "Mom deserves a break!",
     "resume": "Resume",
-    "mainMenu": "Back to title",
-    "restart": "Start over",
-    "confirm": "Start a new game?",
+    "mainMenu": "Main Menu",
+    "restart": "Restart Level",
+    "confirm": "Restart this level?",
     "cancel": "Cancel",
     "yes": "Yes, let’s go",
     "needWash": "Poopy diaper!",
@@ -114,14 +132,32 @@ const TRANSLATIONS = {
     "late": "Time’s up! −1 heart. Baby still needs your help!",
     "wrong": "Oops, try another item! −1 heart. You can still fix it.",
     "calm": "Baby’s happy. Take a little breather.",
-    "helping": "Taking care of baby…",
+    "helping": "",
     "wonTitle": "19:00. Dad’s home!",
     "lostTitle": "Mom needs a break",
     "wonDescription": "You made it! Dad’s on baby duty. Mom has {count} hearts left. Time for tea and a little peace.",
     "lostDescription": "All five nerves have clocked out. What a day! Take a breath and give it another go?",
     "wonNote": "Even the longest day comes to an end.",
     "lostNote": "Tip: watch the thought bubble above baby.",
-    "language": "Language"
+    "language": "Language",
+    "levels": "Levels",
+    "selectLevel": "Select Level",
+    "level1Name": "Newborn",
+    "level2Name": "Growing Up",
+    "level1Card": "Level 1 — Newborn",
+    "level2Card": "Level 2 — Growing Up",
+    "level1Description": "Your first day together. Feed, clean up, and settle baby to sleep.",
+    "level2Description": "Baby’s getting curious! Still too little to sit or walk, but those tiny hands love reaching for toys. Add playtime to your day!",
+    "locked": "Complete Level 1 to unlock",
+    "available": "Ready to play",
+    "back": "Back to Main Menu",
+    "nextLevel": "Next Level",
+    "needPlay": "I want to play!",
+    "successPlay": "One happy rattle, one giggly baby. Mom wins this round!",
+    "toys": "Toys",
+    "playHint": "Play with baby",
+    "wonLevel2": "Another day done! Baby’s had a lovely play, Dad’s home, and Mom has {count} hearts left.",
+    "unlocked": "Level 2 unlocked! A new little adventure awaits."
   }
 };
 const LANGUAGE_KEY = 'surviveTill7.language';
@@ -135,21 +171,52 @@ const NEEDS = [
   { action: 'feed', icon: '🍼', text: 'needFeed', success: 'successFeed' },
   { action: 'sleep', icon: '☾', text: 'needSleep', success: 'successSleep' }
 ];
+
+// Уровни используют одну модель и одни таймеры; различаются только содержимым.
+const PLAY_NEED = {action: 'play', icon: '🪇', text: 'needPlay', success: 'successPlay'};
+const LEVELS = {
+  1: {id:1, name:'level1Name', card:'level1Card', description:'level1Description', needs:NEEDS, objects:['wash','feed','sleep'], babyScale:1, seated:'assets/mother-baby-seated.png', crying:'assets/mother-baby-crying.png', baby:'assets/baby.png'},
+  2: {id:2, name:'level2Name', card:'level2Card', description:'level2Description', needs:[...NEEDS, PLAY_NEED], objects:['wash','feed','sleep','play'], babyScale:1, seated:'assets/mother-baby-seated.png', crying:'assets/mother-baby-crying.png', baby:'assets/baby.png'}
+};
+const PROGRESS_KEY = 'surviveTill7.unlockedLevel';
+class LevelProgress {
+  constructor(storage = null) {
+    this.storage = storage; this.unlocked = 1;
+    try { if (storage && storage.getItem(PROGRESS_KEY) === '2') this.unlocked = 2; } catch { /* Хранилище недоступно. */ }
+  }
+  canStart(id) { return Object.hasOwn(LEVELS, id) && Number(id) <= this.unlocked; }
+  complete(id) {
+    if (Number(id) !== 1 || this.unlocked === 2) return;
+    this.unlocked = 2;
+    try { if (this.storage) this.storage.setItem(PROGRESS_KEY, '2'); } catch { /* Доступно до закрытия страницы. */ }
+  }
+}
+
 // Модель отделена от экрана, чтобы правила можно было проверить отдельно.
 class GameModel {
-  constructor(random = Math.random) { this.random = random; this.reset(); }
+  constructor(random = Math.random) { this.random = random; this.levelId = 1; this.reset(); }
   reset() {
     this.status = 'ready'; this.hearts = 5; this.hour = -1; this.elapsed = 0;
     this.pending = false; this.need = null; this.events = 0; this.feedback = 'ready'; this.mood = '';
     this.timeoutApplied = false; this.action = null; this.actionStarted = 0; this.actionEnd = Infinity;
     this.losses = []; this.lastNeedAction = null; this.needStreak = 0;
+    this.seenNeeds = new Set();
   }
-  start() { this.reset(); this.status = 'playing'; this.newHour(0); }
+  start(levelId = this.levelId) {
+    if (!Object.hasOwn(LEVELS, levelId)) throw new RangeError('Unknown level');
+    this.levelId = Number(levelId); this.reset(); this.status = 'playing'; this.newHour(0);
+  }
   newHour(hour) {
     this.hour = hour; this.events++;
     // После двух повторов выбираем из остальных потребностей без повторного броска.
-    const choices = this.needStreak >= 2 ? NEEDS.filter(need => need.action !== this.lastNeedAction) : NEEDS;
+    const pool = LEVELS[this.levelId].needs;
+    const unseen = pool.filter(need => !this.seenNeeds.has(need.action));
+    const eligible = this.needStreak >= 2 ? pool.filter(need => need.action !== this.lastNeedAction) : pool;
+    // Оставляем случайный выбор, но резервируем последние часы для
+    // ещё не встречавшихся действий. В новой партии список очищается.
+    const choices = unseen.length >= TOTAL_HOURS - hour ? unseen : eligible;
     this.need = choices[Math.floor(this.random() * choices.length)];
+    this.seenNeeds.add(this.need.action);
     this.needStreak = this.need.action === this.lastNeedAction ? this.needStreak + 1 : 1;
     this.lastNeedAction = this.need.action;
     this.pending = true; this.timeoutApplied = false; this.action = null; this.actionEnd = Infinity;
@@ -186,6 +253,7 @@ class GameModel {
   answer(action, elapsed) {
     this.update(elapsed);
     if (this.status !== 'playing' || !this.pending || this.action) return;
+    if (!LEVELS[this.levelId].objects.includes(action)) return;
     if (action !== this.need.action) { this.fail(false); return; }
     this.pending = false; this.action = action; this.actionStarted = this.elapsed;
     this.actionEnd = this.elapsed + RESPONSE_MS; this.mood = 'happy'; this.feedback = this.need.success;
@@ -201,6 +269,10 @@ class GameClock {
 }
 const $ = id => document.getElementById(id);
 const model = new GameModel();
+let storage = null;
+try { storage = localStorage; } catch { /* Игра работает без хранилища. */ }
+const progress = new LevelProgress(storage);
+let menuView = 'title';
 const buttons = [...document.querySelectorAll('[data-action]')];
 let frame = null;
 const gameClock = new GameClock();
@@ -229,7 +301,7 @@ function render() {
   }
   $('family').style.setProperty('--action-time', -(model.elapsed - model.actionStarted) + 'ms');
   renderScene();
-  $('thought').hidden = !model.pending && !model.action;
+  $('thought').hidden = model.status !== 'playing' || !model.pending;
   document.querySelector('.game').classList.toggle('is-paused', gameClock.paused);
   document.querySelector('.game').classList.toggle('is-stopped', model.status !== 'playing');
   $('pause').hidden = model.status !== 'playing';
@@ -239,8 +311,13 @@ function render() {
   $('need-text').textContent = model.pending ? t(model.need.text) : t('helping');
   $('reaction-progress').style.width = model.pending && !model.timeoutApplied ? Math.max(0, 100 * (1 - (model.elapsed - model.hour * HOUR_MS) / RESPONSE_MS)) + '%' : '0%';
   $('message').textContent = t(model.feedback);
-  buttons.forEach(button => { button.disabled = model.status !== 'playing' || !model.pending || gameClock.paused; });
+  buttons.forEach(button => {
+    const available = LEVELS[model.levelId].objects.includes(button.dataset.action);
+    button.hidden = !available;
+    button.disabled = !available || model.status !== 'playing' || !model.pending || gameClock.paused;
+  });
   $('dad').hidden = model.status !== 'won';
+  if (model.status === 'won') progress.complete(model.levelId);
   updateLocalizedState();
   if (model.status !== screenStatus && (model.status === 'won' || model.status === 'lost')) {
     screenStatus = model.status;
@@ -267,6 +344,11 @@ function renderScene() {
   const baby = room.querySelector('.independent-baby');
   const visual = family.querySelector('.family-visual');
   const effects = family.querySelector('.care-effects');
+  const growing = model.levelId === 2;
+  document.querySelector('.growing-care-bottle').style.opacity = 0;
+  family.querySelector('.family-playing').style.opacity = 0;
+  document.querySelector('.play-baby').style.opacity = 0;
+  if (growing && model.action === 'play') { renderPlayScene(); return; }
   const ease = value => { const x = Math.max(0, Math.min(1, value)); return x * x * (3 - 2 * x); };
   let travel = 0, pose = 0, care = 0, bob = 0, age = 0, transfer = 0, turn = 0;
   const destination = {wash: [-24, -3], sleep: [12, -1], feed: [-9, 5]};
@@ -284,17 +366,22 @@ function renderScene() {
   family.style.top = (25 + dy * travel) + '%';
   visual.style.transform = 'translateY(' + bob + 'px)';
   const isCrying = model.mood === 'crying';
-  seated.style.opacity = isCrying ? 0 : 1 - pose;
+  // Мама остаётся одним и тем же изображением при смене эмоции.
+  // Поверх него показываем только плачущее лицо малыша.
+  seated.style.opacity = 1 - pose;
   crying.style.opacity = isCrying ? 1 - pose : 0;
   const separate = model.action === 'sleep' || model.action === 'wash';
   standing.style.opacity = separate ? 0 : pose;
-  const washPose = model.action === 'wash' ? care : 0;
-  empty.style.opacity = separate ? pose * (1 - turn) * (1 - washPose) : 0;
-  washing.style.opacity = pose * washPose;
+  // Для мытья одна цельная поза на всём пути: перекрёстное затухание
+  // двух PNG делало тело полупрозрачным в начале и конце ухода.
+  const isWashing = model.action === 'wash';
+  empty.style.opacity = separate && !isWashing ? pose * (1 - turn) : 0;
+  washing.style.opacity = isWashing ? pose : 0;
   back.style.opacity = pose * turn;
   // Компенсация узкого портретного PNG сохраняет размер головы и малыша.
   // Обе позы опираются на одну точку у стоп.
   seated.style.scale = '1 ' + (1 + pose * 0.18);
+  crying.style.scale = seated.style.scale;
   standing.style.transform = 'translateY(' + ((1 - pose) * 18) + '%) scale(1.52, ' + (1.14 + pose * 0.38) + ')';
   const mirror = model.action === 'wash' ? -1 : 1;
   empty.style.transform = 'translateY(' + ((1 - pose) * 18) + '%) rotate(' + (transfer * (model.action === 'sleep' ? 2 : -1.5) + (model.action === 'wash' ? Math.sin(age / 80) * care : 0)) + 'deg) scale(' + (1.52 * mirror) + ', ' + (1.14 + pose * 0.38) + ')';
@@ -310,10 +397,10 @@ function renderScene() {
   const targetY = room.clientHeight * (model.action === 'sleep' ? 0.34 : 0.24);
   // После подхода малыш сразу появляется внутри предмета, без пролёта по дуге.
   // Перед возвращением мамы он так же мгновенно оказывается у неё на руках.
-  const inFurniture = separate && age >= 600 && age < 1520;
+  const inFurniture = (model.action === 'sleep' || model.action === 'wash') && age >= 600 && age < 1520;
   baby.style.left = ((inFurniture ? targetX : heldX) / room.clientWidth * 100) + '%';
   baby.style.top = ((inFurniture ? targetY : heldY) / room.clientHeight * 100) + '%';
-  baby.style.width = ((inFurniture ? room.clientWidth * 0.185 : fw * 0.40) / room.clientWidth * 100) + '%';
+  baby.style.width = ((inFurniture ? room.clientWidth * 0.185 : fw * 0.40) * LEVELS[model.levelId].babyScale / room.clientWidth * 100) + '%';
   baby.style.opacity = separate ? pose : 0;
   // В руках малыш перед мамой; внутри чаши/кроватки — за их передним краем.
   const behindFurniture = inFurniture;
@@ -329,6 +416,68 @@ function renderScene() {
   document.querySelector('.table-bottle').style.opacity = model.action === 'feed' ? 1 - care : 1;
 }
 
+
+
+// Единственная шкала времени также управляет новым двухсекундным действием.
+function renderPlayScene() {
+  const family = $('family'), room = document.querySelector('.illustrated-room');
+  const baby = document.querySelector('.play-baby');
+  const age = Math.max(0, Math.min(RESPONSE_MS, model.elapsed - model.actionStarted));
+  const ease = x => { x = Math.max(0, Math.min(1, x)); return x*x*(3-2*x); };
+  const pose = ease(age / 180) * (1 - ease((age - 1820) / 180));
+  const travel = ease((age - 180) / 320) * (1 - ease((age - 1700) / 120));
+  const lower = ease((age - 500) / 180) * (1 - ease((age - 1500) / 200));
+  const engage = ease((age - 350) / 150) * (1 - ease((age - 1500) / 150));
+  family.style.left = (28 + travel) + '%';
+  family.style.top = (25 + 9 * travel) + '%';
+  family.querySelector('.family-visual').style.transform = 'none';
+  family.querySelector('.family-seated').style.opacity = 1 - pose;
+  family.querySelector('.family-seated').style.scale = '1 ' + (1 + pose * 0.18);
+  const standing = family.querySelector('.family-standing');
+  standing.style.opacity = pose * (1 - lower);
+  standing.style.transform = 'translateY(' + ((1 - pose) * 18) + '%) scale(1.52, ' + (1.14 + pose * 0.38) + ')';
+  ['.family-empty','.family-back','.family-washing','.family-crying'].forEach(selector => {family.querySelector(selector).style.opacity=0});
+  const mother = family.querySelector('.family-playing');
+  mother.style.opacity = lower;
+  mother.style.scale = '1.18';
+  mother.style.transform = 'rotate(' + Math.sin(age / 110) * engage * 1.5 + 'deg)';
+  baby.style.left = (51 + 19 * lower) + '%';
+  baby.style.top = (36 + 18 * lower) + '%';
+  baby.style.width = (18.4 + 5.1 * lower) + '%';
+  baby.style.opacity = lower;
+  baby.style.transform = 'rotate(' + (-20 * (1-lower) + Math.sin(age/95)*engage*1.2) + 'deg)';
+  room.dataset.care = 'play';
+  room.style.setProperty('--scene-age', -age+'ms');
+  room.style.setProperty('--scene-care', engage);
+  document.querySelector('.independent-baby').style.opacity = 0;
+  family.querySelector('.care-effects').style.opacity = 0;
+  document.querySelector('.table-bottle').style.opacity = 1;
+  $('thought').style.left = '30%';
+}
+
+function applyLevelAppearance() {
+  const config = LEVELS[model.levelId];
+  const room = document.querySelector('.illustrated-room');
+  room.dataset.level = model.levelId;
+  document.querySelector('.family-seated').setAttribute('src', config.seated);
+  document.querySelector('.family-crying').setAttribute('src', config.crying);
+  document.querySelector('.independent-baby > img').setAttribute('src', config.baby);
+  document.querySelector('.toys-target').hidden = model.levelId !== 2;
+}
+function updateLevelCards() {
+  const unlocked = progress.canStart(2);
+  $('choose-level-2').disabled = !unlocked;
+  $('choose-level-2').setAttribute('aria-label', t('level2Card') + '. ' + t(unlocked ? 'available' : 'locked'));
+  $('level2-lock').textContent = t(unlocked ? 'available' : 'locked');
+  $('level2-icon').textContent = unlocked ? '2' : '🔒';
+}
+function openLevels() {
+  if (model.status === 'playing') return;
+  stopFrame(); gameClock.pause(); menuView = 'levels';
+  $('overlay').hidden = true; $('levels-overlay').hidden = false;
+  updateLevelCards(); $('choose-level-1').focus();
+}
+
 function schedule() {
   if (frame !== null || model.status !== 'playing' || gameClock.paused) return;
   const currentGeneration = generation;
@@ -342,9 +491,13 @@ function tick() {
   model.update(elapsedNow()); render(); schedule();
 }
 function stopFrame() { generation++; if (frame !== null) cancelAnimationFrame(frame); frame = null; }
-function start() {
+function start(levelId = model.levelId) {
+  levelId = Number(levelId);
+  if (!progress.canStart(levelId)) return false;
+  menuView = 'title';
+  $('levels-overlay').hidden = true;
   stopFrame(); gameClock.reset(); screenStatus = 'playing'; familyState = ''; lastHour = -1;
-  model.start(); $('overlay').hidden = true; $('overlay').classList.remove('ended');
+  model.start(levelId); applyLevelAppearance(); $('overlay').hidden = true; $('overlay').classList.remove('ended');
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
   // Новая партия также начинает визуальные анимации с начала.
   document.querySelectorAll('.family, .family *').forEach(element => {
@@ -360,8 +513,9 @@ function pause() {
   if (model.status === 'playing') $('resume').focus();
 }
 function returnToTitle() {
-  if (model.status !== 'playing' || !gameClock.paused) return;
-  stopFrame(); model.reset(); gameClock.reset(); gameClock.pause();
+  if (model.status === 'playing' && !gameClock.paused) return;
+  menuView = 'title'; $('levels-overlay').hidden = true;
+  stopFrame(); model.levelId = 1; model.reset(); applyLevelAppearance(); gameClock.reset(); gameClock.pause();
   screenStatus = 'ready'; familyState = ''; lastHour = -1;
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
   $('overlay').hidden = false; $('overlay').classList.remove('ended');
@@ -375,7 +529,13 @@ buttons.forEach(button => button.addEventListener('click', () => {
   if (gameClock.paused || model.status !== 'playing') return;
   model.answer(button.dataset.action, elapsedNow()); render();
 }));
-$('start').addEventListener('click', start);
+$('start').addEventListener('click', () => start(model.status === 'ready' ? 1 : model.levelId));
+$('open-levels').addEventListener('click', openLevels);
+$('levels-back').addEventListener('click', returnToTitle);
+$('result-menu').addEventListener('click', returnToTitle);
+$('choose-level-1').addEventListener('click', () => start(1));
+$('choose-level-2').addEventListener('click', () => start(2));
+$('next-level').addEventListener('click', () => { if (model.status === 'won' && model.levelId === 1) start(2); });
 $('pause').addEventListener('click', pause);
 $('resume').addEventListener('click', resume);
 $('main-menu').addEventListener('click', returnToTitle);
@@ -404,6 +564,11 @@ function updateLocalizedState() {
   $('hearts').setAttribute('aria-label', t('hearts', {count: model.hearts}));
   $('need-text').textContent = model.pending ? t(model.need.text) : t(model.status === 'ready' ? 'world' : 'helping');
   $('message').textContent = t(model.feedback);
+  const ended = model.status === 'won' || model.status === 'lost';
+  $('next-level').hidden = !(model.status === 'won' && model.levelId === 1);
+  $('result-menu').hidden = !ended;
+  $('level-indicator').textContent = t(LEVELS[model.levelId].name);
+  updateLevelCards();
   if (model.status === 'ready') {
     $('screen-title').innerHTML = 'Survive<br>till <em>7</em>';
     $('screen-icon').textContent = '☀';
@@ -414,9 +579,9 @@ function updateLocalizedState() {
   } else if (model.status === 'won' || model.status === 'lost') {
     const result = model.status;
     $('screen-title').textContent = t(result + 'Title');
-    $('screen-description').textContent = t(result + 'Description', {count: model.hearts});
+    $('screen-description').textContent = t(result === 'won' && model.levelId === 2 ? 'wonLevel2' : result + 'Description', {count: model.hearts});
     $('start').textContent = t('restart');
-    document.querySelector('.card-note').textContent = t(result + 'Note');
+    document.querySelector('.card-note').textContent = t(result === 'won' && model.levelId === 1 ? 'unlocked' : result + 'Note');
   }
 }
 function applyLanguage() {
@@ -437,3 +602,5 @@ document.querySelectorAll('[data-language]').forEach(button => {
   button.addEventListener('click', () => setLanguage(button.dataset.language));
 });
 applyLanguage();
+
+applyLevelAppearance();
