@@ -9,6 +9,8 @@ const CAT_HIT_MS = 900;
 // Централизованные тексты. Модель хранит ключи, а не переведённые сообщения.
 const TRANSLATIONS = {
   "ru": {
+    "musicOn": "Включить музыку",
+    "musicOff": "Выключить музыку",
     "cleanSoil": "Убрать землю",
     "catMess": "Вот это кошачьи проделки! Земля перекрыла путь к раковине.",
     "sinkBlocked": "Сначала убери землю возле горшка!",
@@ -99,6 +101,8 @@ const TRANSLATIONS = {
     "unlocked": "Второй уровень открыт! Новое приключение ждёт."
   },
   "en": {
+    "musicOn": "Turn music on",
+    "musicOff": "Turn music off",
     "cleanSoil": "Sweep up",
     "catMess": "A little cat-astrophe! Soil is blocking the way to the sink.",
     "sinkBlocked": "Sweep up the soil first!",
@@ -355,6 +359,29 @@ let heartMarkup = '';
 let familyState = '';
 let lastHour = -1;
 let screenStatus = 'ready';
+const backgroundMusic = $('background-music');
+backgroundMusic.volume = .35;
+const MUSIC_KEY = 'surviveTill7.musicEnabled';
+let musicEnabled = true;
+try { musicEnabled = localStorage.getItem(MUSIC_KEY) !== 'false'; } catch { /* Выбор действует до закрытия страницы. */ }
+let musicPlaying = false;
+function updateMusicButton() {
+  const button = $('music-toggle');
+  button.setAttribute('aria-pressed',String(musicEnabled));
+  button.setAttribute('aria-label',t(musicEnabled ? 'musicOff' : 'musicOn'));
+  button.title = t(musicEnabled ? 'musicOff' : 'musicOn');
+  button.querySelector('span').textContent = musicEnabled ? '🔊' : '🔇';
+}
+function syncMusic(retry = false) {
+  const paused = story ? storyClock.paused : model.status === 'playing' && gameClock.paused;
+  const playing = musicEnabled && !document.hidden && !paused;
+  if (playing === musicPlaying && !(retry === true && playing && backgroundMusic.paused)) return;
+  musicPlaying = playing;
+  if (playing) {
+    // Если автозапуск запрещён, следующее нажатие игрока повторит попытку.
+    backgroundMusic.play().catch(() => {});
+  } else backgroundMusic.pause();
+}
 function elapsedNow() { return gameClock.read(); }
 function render() {
   if (model.status === 'won' && !story && !outroCompleted) beginStory('outro');
@@ -416,6 +443,7 @@ function render() {
     $('instructions').hidden = true;
     $('start').focus();
   }
+  syncMusic();
 }
 
 // Визуальная постановка использует ТОЛЬКО существующее игровое время.
@@ -864,7 +892,7 @@ $('cancel-restart').addEventListener('click', () => {
 $('confirm-start').addEventListener('click', () => {
   if ((story ? story.kind === 'intro' && storyClock.paused : gameClock.paused && model.status === 'playing') && !$('confirm-restart').hidden) start();
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); else resumeStory(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); else resumeStory(); syncMusic(); });
 window.addEventListener('blur', pause);
 window.addEventListener('pagehide', pause);
 window.addEventListener('focus', resumeStory);
@@ -909,6 +937,7 @@ function applyLanguage() {
   document.querySelectorAll('[data-i18n-title]').forEach(element => { element.title = t(element.dataset.i18nTitle); });
   document.querySelectorAll('[data-language]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.language === language)); });
   updateLocalizedState();
+  updateMusicButton();
 }
 function setLanguage(next) {
   if (!Object.hasOwn(TRANSLATIONS, next)) return;
@@ -919,6 +948,14 @@ function setLanguage(next) {
 document.querySelectorAll('[data-language]').forEach(button => {
   button.addEventListener('click', () => setLanguage(button.dataset.language));
 });
+$('music-toggle').addEventListener('click', () => {
+  musicEnabled = !musicEnabled;
+  try { localStorage.setItem(MUSIC_KEY,String(musicEnabled)); } catch { /* Хранилище может быть отключено. */ }
+  updateMusicButton(); syncMusic(true);
+});
+document.addEventListener('click', event => { if (event.isTrusted) syncMusic(true); });
+document.addEventListener('keydown', event => { if (event.isTrusted && (event.key === 'Enter' || event.key === ' ')) syncMusic(true); });
 applyLanguage();
 
 applyLevelAppearance();
+syncMusic();

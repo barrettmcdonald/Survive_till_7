@@ -157,3 +157,6 @@ header{padding:7px 16px 8px;border-radius:0 0 18px 18px}.brand{min-height:35px;m
 .spilled-soil{left:23%;width:17%}
 .cleaning-tools{left:23%}
 .clean-soil,.illustrated-room[data-cleaning="true"] .clean-soil{left:24%;top:44%;width:17%}
+.music-toggle{position:fixed;top:max(4px,env(safe-area-inset-top));right:max(106px,calc((100vw - 480px)/2 + 106px));z-index:30;width:38px;height:38px;padding:0;border:1px solid #e9dfd2;border-radius:12px;background:#fffcf5;color:#968477;display:grid;place-items:center;font-size:19px;line-height:1}
+.music-toggle[aria-pressed="true"]{background:#8fa38a;border-color:#8fa38a;color:#fff}
+.brand{padding-right:146px}
