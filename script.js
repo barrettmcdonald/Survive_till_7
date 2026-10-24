@@ -392,9 +392,10 @@ function render() {
   $('thought').hidden = model.status !== 'playing' || !model.pending;
   document.querySelector('.game').classList.toggle('is-paused', story ? storyClock.paused : gameClock.paused);
   document.querySelector('.game').classList.toggle('is-stopped', !story && model.status !== 'playing');
-  $('pause').hidden = Boolean(story) || model.status !== 'playing';
-  $('pause').disabled = gameClock.paused;
-  $('pause-overlay').hidden = !gameClock.paused || model.status !== 'playing';
+  const morning = story?.kind === 'intro';
+  $('pause').hidden = !morning && (Boolean(story) || model.status !== 'playing');
+  $('pause').disabled = story ? storyClock.paused : gameClock.paused;
+  $('pause-overlay').hidden = story ? !(morning && storyClock.paused && story.manualPaused) : !gameClock.paused || model.status !== 'playing';
   $('need-icon').textContent = model.pending ? model.need.icon : '♡';
   $('need-text').textContent = model.pending ? t(model.need.text) : t('helping');
   $('reaction-progress').style.width = model.pending && !model.timeoutApplied ? Math.max(0, 100 * (1 - (model.elapsed - model.needShownAt) / RESPONSE_MS)) + '%' : '0%';
@@ -540,22 +541,24 @@ function renderCleanupScene() {
 
 function renderCatEvent(storyVisible) {
   const root = $('cat-event'), room = document.querySelector('.room'), clean = $('clean-soil');
-  const visible = model.levelId === 2 && !storyVisible && model.status !== 'ready';
+  // Общий горшок для обоих уровней и сюжетных сцен; кошка — только на втором.
+  const visible = model.status !== 'ready';
+  const interactive = visible && model.levelId === 2 && !storyVisible;
   root.hidden = !visible;
   document.querySelector('.plant-patch').toggleAttribute('hidden', !visible);
-  room.dataset.cleaning = String(visible && model.cleaning);
+  room.dataset.cleaning = String(interactive && model.cleaning);
   room.dataset.cleanupCrying = String(model.cleaning && model.mood === 'crying');
   document.querySelectorAll('.cleanup-tears i').forEach((tear, i) => {
     const phase = ((model.elapsed / 650) + i * .5) % 1;
     tear.style.opacity = 1 - phase;
     tear.style.transform = 'translateY(' + (phase * 12) + 'px) rotate(25deg)';
   });
-  clean.hidden = !visible || !model.dirty || model.status !== 'playing';
+  clean.hidden = !interactive || !model.dirty || model.status !== 'playing';
   clean.disabled = gameClock.paused || Boolean(model.action) || model.cleaning;
   clean.style.transform = model.elapsed - model.blockedAt < 1200 ? 'scale(' + (1 + .13 * Math.sin((model.elapsed - model.blockedAt) / 90) ** 2) + ')' : 'none';
   const age = model.elapsed - model.catStarted;
   const cat = document.querySelector('.event-cat');
-  cat.hidden = !visible || model.catState !== 'running' || model.status !== 'playing';
+  cat.hidden = !interactive || model.catState !== 'running' || model.status !== 'playing';
   // Сначала спускаемся слева от мамы, затем пересекаем пол ниже её ног.
   const path = [[0,-36,43],[CAT_HIT_MS,12.2,43],[1300,16,72],[2300,82,72],[CAT_RUN_MS,114,50]];
   const segment = path.findIndex((point,i) => i < path.length-1 && age <= path[i+1][0]);
@@ -566,7 +569,7 @@ function renderCatEvent(storyVisible) {
   cat.style.left = (from[1]+(to[1]-from[1])*blend)+'%';
   cat.style.top = (from[2]+(to[2]-from[2])*blend)+'%';
   cat.style.transform = 'translateY(' + (Math.sin(age / 100) * 3) + 'px) rotate(' + (Math.sin(age / 130) * 3) + 'deg)';
-  const fall = model.dirty ? Math.max(0, Math.min(1, (age - CAT_HIT_MS) / 600)) : 0;
+  const fall = model.dirty && !storyVisible ? Math.max(0, Math.min(1, (age - CAT_HIT_MS) / 600)) : 0;
   const cleanupAge = model.elapsed - model.cleanupStarted;
   const collected = model.cleaning ? Math.max(0, Math.min(1, (cleanupAge - 450) / 1150)) : 0;
   const restore = model.cleaning ? Math.max(0, Math.min(1, (cleanupAge - 1600) / 400)) : 0;
@@ -577,7 +580,7 @@ function renderCatEvent(storyVisible) {
   soil.style.transformOrigin = model.cleaning ? '95% 65%' : '20% 60%';
   soil.style.transform = 'scale(' + ((.2 + .8 * fall) * (1 - collected * .7)) + ')';
   const tools = document.querySelector('.cleaning-tools');
-  tools.toggleAttribute('hidden', !visible || !model.cleaning);
+  tools.toggleAttribute('hidden', !interactive || !model.cleaning);
   const sweeping = cleanupAge >= 350 && cleanupAge < 1650;
   tools.style.opacity = sweeping ? Math.max(0,Math.min(1,(1650-cleanupAge)/150)) : 0;
   // Совок остаётся у земли; только щётка сгребает землю в его сторону.
@@ -688,12 +691,19 @@ function start(levelId = model.levelId) {
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
   beginStory('intro'); render();
 }
-function pauseStory() {
+function pauseStory(manual = false) {
   if (!story || storyClock.paused) return;
+  if (manual === true) {
+    story.manualPaused = true;
+    $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
+  }
   storyClock.pause(); stopFrame(); render();
+  if (manual === true && story.kind === 'intro') $('resume').focus();
 }
-function resumeStory() {
+function resumeStory(manual = false) {
   if (!story || !storyClock.paused || document.hidden || !document.hasFocus()) return;
+  if (story.manualPaused && manual !== true) return;
+  story.manualPaused = false;
   storyClock.resume(); render(); schedule();
 }
 function storyFeedback(kind, age) {
@@ -801,8 +811,8 @@ function startGameplay(levelId = model.levelId) {
   render();
   if (document.hidden || !document.hasFocus()) pause(); else schedule();
 }
-function pause() {
-  if (story) { pauseStory(); return; }
+function pause(manual = false) {
+  if (story) { pauseStory(manual === true); return; }
   if (model.status !== 'playing' || gameClock.paused) return;
   gameClock.pause(); model.update(elapsedNow()); stopFrame();
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false; render();
@@ -819,6 +829,10 @@ function returnToTitle() {
   render(); $('start').focus();
 }
 function resume() {
+  if (story?.kind === 'intro') {
+    if (!$('confirm-restart').hidden) return;
+    resumeStory(true); $('pause').focus(); return;
+  }
   if (model.status !== 'playing' || !gameClock.paused || document.hidden || !$('confirm-restart').hidden) return;
   gameClock.resume(); render(); schedule(); $('pause').focus();
 }
@@ -837,26 +851,26 @@ $('result-menu').addEventListener('click', returnToTitle);
 $('choose-level-1').addEventListener('click', () => start(1));
 $('choose-level-2').addEventListener('click', () => start(2));
 $('next-level').addEventListener('click', () => { if (model.status === 'won' && model.levelId === 1) start(2); });
-$('pause').addEventListener('click', pause);
+$('pause').addEventListener('click', () => pause(true));
 $('resume').addEventListener('click', resume);
 $('main-menu').addEventListener('click', returnToTitle);
 $('restart').addEventListener('click', () => {
-  if (!gameClock.paused || model.status !== 'playing') return;
+  if (story ? !(story.kind === 'intro' && storyClock.paused) : !gameClock.paused || model.status !== 'playing') return;
   $('pause-menu').hidden = true; $('confirm-restart').hidden = false; $('cancel-restart').focus();
 });
 $('cancel-restart').addEventListener('click', () => {
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false; $('restart').focus();
 });
 $('confirm-start').addEventListener('click', () => {
-  if (gameClock.paused && !$('confirm-restart').hidden) start();
+  if ((story ? story.kind === 'intro' && storyClock.paused : gameClock.paused && model.status === 'playing') && !$('confirm-restart').hidden) start();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); else resumeStory(); });
 window.addEventListener('blur', pause);
 window.addEventListener('pagehide', pause);
 window.addEventListener('focus', resumeStory);
 document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || model.status !== 'playing') return;
-  if (!gameClock.paused) pause();
+  if (event.key !== 'Escape' || (model.status !== 'playing' && story?.kind !== 'intro')) return;
+  if (!(story ? storyClock.paused : gameClock.paused)) pause(true);
   else if (!$('confirm-restart').hidden) $('cancel-restart').click();
   else resume();
 });
