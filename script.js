@@ -3,10 +3,24 @@
 const HOUR_MS = 6000;
 const RESPONSE_MS = 2000;
 const TOTAL_HOURS = 12;
+const STORY_MS = 5000;
+const CAT_RUN_MS = 2800;
+const CAT_HIT_MS = 900;
 // Централизованные тексты. Модель хранит ключи, а не переведённые сообщения.
 const TRANSLATIONS = {
   "ru": {
+    "cleanSoil": "Убрать землю",
+    "catMess": "Вот это кошачьи проделки! Земля перекрыла путь к раковине.",
+    "sinkBlocked": "Сначала убери землю возле горшка!",
+    "cleaningSoil": "Малыш в кроватке, мама собирает землю…",
+    "soilClean": "Всё чисто! К раковине снова можно пройти.",
     "gameName": "Дожить до 7",
+    "storyMorning": "Доброе утро! Ещё минутка вместе ♡",
+    "storyKiss": "До вечера, любимая ♡",
+    "storyWave": "Хорошего дня!",
+    "storyLeave": "Папа уходит на работу…",
+    "storyReturn": "Папа вернулся домой!",
+    "storyHug": "Вы справились. Теперь все вместе ♡",
     "gameTitleHtml": "Дожить<br>до <em>7</em>",
     "brand": "ОДИН ОЧЕНЬ ДЛИННЫЙ ДЕНЬ",
     "time": "Время",
@@ -85,7 +99,18 @@ const TRANSLATIONS = {
     "unlocked": "Второй уровень открыт! Новое приключение ждёт."
   },
   "en": {
+    "cleanSoil": "Sweep up",
+    "catMess": "A little cat-astrophe! Soil is blocking the way to the sink.",
+    "sinkBlocked": "Sweep up the soil first!",
+    "cleaningSoil": "Baby’s safe in the crib. Mom’s sweeping up…",
+    "soilClean": "All tidy! The way to the sink is clear.",
     "gameName": "Survive till 7",
+    "storyMorning": "Good morning! One more moment together ♡",
+    "storyKiss": "See you tonight, love ♡",
+    "storyWave": "Have a lovely day!",
+    "storyLeave": "Dad’s off to work…",
+    "storyReturn": "Dad’s home!",
+    "storyHug": "You made it. Together again ♡",
     "gameTitleHtml": "Survive<br>till <em>7</em>",
     "brand": "ONE VERY LONG DAY",
     "time": "Time",
@@ -206,10 +231,15 @@ class GameModel {
     this.losses = []; this.lastNeedAction = null; this.needStreak = 0;
     this.seenNeeds = new Set();
     this.queuedNeed = null; this.needShownAt = 0; this.dayEnded = false;
+    this.catAt = Infinity; this.catState = 'waiting'; this.catStarted = 0;
+    this.catHitAt = Infinity; this.catEnd = Infinity; this.dirty = false;
+    this.cleaning = false; this.cleanupStarted = 0; this.cleanupEnd = Infinity;
+    this.blockedAt = -Infinity;
   }
   start(levelId = this.levelId) {
     if (!Object.hasOwn(LEVELS, levelId)) throw new RangeError('Unknown level');
     this.levelId = Number(levelId); this.reset(); this.status = 'playing'; this.newHour(0);
+    if (this.levelId === 2) this.catAt = 2 * HOUR_MS; // 09:00 каждого дня.
   }
   newHour(hour) {
     this.hour = hour; this.events++;
@@ -236,13 +266,14 @@ class GameModel {
   win() {
     this.status = 'won'; this.pending = false; this.need = null; this.queuedNeed = null;
     this.action = null; this.actionEnd = Infinity; this.mood = 'happy';
+    this.cleaning = false; this.cleanupEnd = Infinity;
   }
   fail(late) {
     if (this.status !== 'playing' || !this.pending || this.action) return;
     if (late) { if (this.timeoutApplied) return; this.timeoutApplied = true; }
     this.hearts--; this.losses.push({ index: this.hearts, at: this.elapsed }); this.mood = 'crying';
     this.feedback = late ? 'late' : 'wrong';
-    if (this.hearts === 0) { this.status = 'lost'; this.action = null; this.actionEnd = Infinity; }
+    if (this.hearts === 0) { this.status = 'lost'; this.action = null; this.actionEnd = Infinity; this.cleaning = false; this.cleanupEnd = Infinity; }
   }
   update(elapsed) {
     if (this.status !== 'playing') return;
@@ -251,19 +282,32 @@ class GameModel {
     while (this.status === 'playing') {
       const hourAt = this.dayEnded ? Infinity : (this.hour + 1) * HOUR_MS;
       const timeoutAt = this.pending && !this.timeoutApplied ? this.needShownAt + RESPONSE_MS : Infinity;
-      const next = Math.min(hourAt, timeoutAt, this.actionEnd);
+      const catAt = this.levelId === 2 && this.catState === 'waiting' && !this.action ? Math.max(this.elapsed, this.catAt) : Infinity;
+      const next = Math.min(hourAt, timeoutAt, this.actionEnd, catAt, this.catHitAt, this.catEnd, this.cleanupEnd);
       if (next > target) { this.elapsed = target; break; }
       this.elapsed = next;
       // На границе часа сохраняем действие; показ новой потребности ждёт его конца.
       if (next === hourAt) {
         if (this.hour + 1 === TOTAL_HOURS) {
           this.dayEnded = true; this.pending = false; this.queuedNeed = null;
-          if (!this.action) { this.win(); break; }
-          continue;
+          // В 19:00 игровая часть заканчивается ровно на 72-й секунде.
+          // После неё UI показывает отдельную вечернюю сцену.
+          this.win(); break;
         }
         this.newHour(this.hour + 1);
       } else if (next === timeoutAt) { this.fail(true); }
-      else {
+      else if (next === catAt) {
+        this.catState = 'running'; this.catStarted = next;
+        this.catHitAt = next + CAT_HIT_MS; this.catEnd = next + CAT_RUN_MS;
+      } else if (next === this.catHitAt) {
+        this.dirty = true; this.catHitAt = Infinity;
+        if (!this.pending) this.feedback = 'catMess';
+      } else if (next === this.catEnd) {
+        this.catState = 'gone'; this.catEnd = Infinity;
+      } else if (next === this.cleanupEnd) {
+        this.cleaning = false; this.cleanupEnd = Infinity; this.dirty = false;
+        if (!this.pending) { this.feedback = 'soilClean'; this.mood = ''; }
+      } else {
         this.action = null; this.actionEnd = Infinity; this.mood = ''; this.feedback = 'calm';
         if (this.dayEnded) this.win();
         else if (this.queuedNeed) this.showNeed(this.queuedNeed);
@@ -272,11 +316,18 @@ class GameModel {
   }
   answer(action, elapsed) {
     this.update(elapsed);
-    if (this.status !== 'playing' || !this.pending || this.action) return;
+    if (this.status !== 'playing' || !this.pending || this.action || this.cleaning) return;
     if (!LEVELS[this.levelId].objects.includes(action)) return;
+    if (action === 'wash' && this.dirty) { this.blockedAt = this.elapsed; this.feedback = 'sinkBlocked'; return; }
     if (action !== this.need.action) { this.fail(false); return; }
     this.pending = false; this.action = action; this.actionStarted = this.elapsed;
     this.actionEnd = this.elapsed + RESPONSE_MS; this.mood = 'happy'; this.feedback = this.need.success;
+  }
+  cleanup(elapsed) {
+    this.update(elapsed);
+    if (this.status !== 'playing' || this.levelId !== 2 || !this.dirty || this.action || this.cleaning) return;
+    this.cleaning = true; this.cleanupStarted = this.elapsed; this.cleanupEnd = this.elapsed + RESPONSE_MS;
+    this.feedback = 'cleaningSoil';
   }
 }
 // Пауза замораживает именно игровое время; продолжительность паузы не накапливается.
@@ -296,6 +347,9 @@ let menuView = 'title';
 const buttons = [...document.querySelectorAll('[data-action]')];
 let frame = null;
 const gameClock = new GameClock();
+const storyClock = new GameClock();
+let story = null;
+let outroCompleted = false;
 let generation = 0;
 let heartMarkup = '';
 let familyState = '';
@@ -303,6 +357,7 @@ let lastHour = -1;
 let screenStatus = 'ready';
 function elapsedNow() { return gameClock.read(); }
 function render() {
+  if (model.status === 'won' && !story && !outroCompleted) beginStory('outro');
   const minutes = model.status === 'won' ? 19 * 60 : 7 * 60 + Math.min(720, Math.floor(model.elapsed / HOUR_MS * 60));
   $('clock').textContent = String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
   const markup = Array.from({length: 5}, (_, i) => '<span class="' + (i < model.hearts ? '' : 'lost') + '">♥</span>').join(' ');
@@ -320,11 +375,24 @@ function render() {
     $('family').className = state; familyState = state; lastHour = model.hour;
   }
   $('family').style.setProperty('--action-time', -(model.elapsed - model.actionStarted) + 'ms');
-  renderScene();
+  const storyVisible = Boolean(story) || (outroCompleted && model.status === 'won');
+  document.querySelector('.game').classList.toggle('is-story', storyVisible);
+  if (storyVisible) renderStoryScene(story ? story.kind : 'outro', story ? storyClock.read() : STORY_MS);
+  else {
+    $('dad').hidden = true;
+    document.querySelector('.story-hug-arm').hidden = true;
+    document.querySelector('.story-baby-front').hidden = true;
+    document.querySelector('.story-affection').hidden = true;
+    document.querySelector('.story-standing-smile').style.opacity = 0;
+    document.querySelector('.story-rising-legs').style.opacity = 0;
+    document.querySelector('.family-standing').style.clipPath = 'none';
+    renderScene();
+  }
+  renderCatEvent(storyVisible);
   $('thought').hidden = model.status !== 'playing' || !model.pending;
-  document.querySelector('.game').classList.toggle('is-paused', gameClock.paused);
-  document.querySelector('.game').classList.toggle('is-stopped', model.status !== 'playing');
-  $('pause').hidden = model.status !== 'playing';
+  document.querySelector('.game').classList.toggle('is-paused', story ? storyClock.paused : gameClock.paused);
+  document.querySelector('.game').classList.toggle('is-stopped', !story && model.status !== 'playing');
+  $('pause').hidden = Boolean(story) || model.status !== 'playing';
   $('pause').disabled = gameClock.paused;
   $('pause-overlay').hidden = !gameClock.paused || model.status !== 'playing';
   $('need-icon').textContent = model.pending ? model.need.icon : '♡';
@@ -334,12 +402,12 @@ function render() {
   buttons.forEach(button => {
     const available = LEVELS[model.levelId].objects.includes(button.dataset.action);
     button.hidden = !available;
-    button.disabled = !available || model.status !== 'playing' || !model.pending || gameClock.paused;
+    button.disabled = Boolean(story) || !available || model.status !== 'playing' || !model.pending || gameClock.paused || model.cleaning;
+    if (button.dataset.action === 'wash') button.setAttribute('aria-describedby', model.dirty ? 'clean-soil' : '');
   });
-  $('dad').hidden = model.status !== 'won';
   if (model.status === 'won') progress.complete(model.levelId);
   updateLocalizedState();
-  if (model.status !== screenStatus && (model.status === 'won' || model.status === 'lost')) {
+  if (!story && model.status !== screenStatus && (model.status === 'won' || model.status === 'lost')) {
     screenStatus = model.status;
     const won = model.status === 'won';
     $('overlay').hidden = false; $('overlay').classList.add('ended');
@@ -353,6 +421,7 @@ function render() {
 // Встать, подойти, выполнить уход, вернуться и сесть — за те же 2000 мс.
 // Ни setTimeout, ни новых игровых состояний или изменений баланса здесь нет.
 function renderScene() {
+  if (model.cleaning) { renderCleanupScene(); return; }
   const family = $('family');
   const seated = family.querySelector('.family-seated');
   const crying = family.querySelector('.family-crying');
@@ -436,6 +505,87 @@ function renderScene() {
   document.querySelector('.table-bottle').style.opacity = model.action === 'feed' ? 1 - care : 1;
 }
 
+function renderCleanupScene() {
+  const family = $('family'), room = document.querySelector('.room');
+  const age = model.elapsed - model.cleanupStarted;
+  const ease = x => { x = Math.max(0, Math.min(1, x)); return x*x*(3-2*x); };
+  const travel = ease(age / 350);
+  const returning = age >= 1800;
+  const fadeOut = 1 - ease((age - 1600) / 200);
+  const fadeIn = ease((age - 1800) / 200);
+  // Мама справа от земли: её силуэт не закрывает упавший горшок слева.
+  family.style.left = (28 + 12 * travel) + '%'; family.style.top = (25 + travel) + '%';
+  family.querySelector('.family-visual').style.transform = 'none';
+  family.querySelectorAll('.family-visual > img').forEach(img => { img.style.opacity = 0; });
+  const mother = family.querySelector('.family-washing');
+  mother.style.opacity = returning ? 0 : fadeOut;
+  mother.style.transform = 'rotate(' + (-22 * travel) + 'deg) scale(-1.52,' + (1.52 - .22 * travel) + ')';
+  if (returning) {
+    family.style.left = '28%'; family.style.top = '25%';
+    const seated = family.querySelector('.family-seated');
+    seated.style.opacity = fadeIn; seated.style.scale = '1'; seated.style.transform = 'none';
+    family.querySelector('.family-crying').style.opacity = model.mood === 'crying' ? fadeIn : 0;
+  }
+  family.querySelector('.care-effects').style.opacity = 0;
+  document.querySelector('.play-baby').style.opacity = 0;
+  document.querySelector('.growing-care-bottle').style.opacity = 0;
+  document.querySelector('.table-bottle').style.opacity = 1;
+  const baby = document.querySelector('.independent-baby');
+  baby.style.left = '76%'; baby.style.top = '34%'; baby.style.width = '18.5%'; baby.style.opacity = returning ? 0 : fadeOut; baby.style.zIndex = 5;
+  baby.dataset.depth = 'inside'; baby.querySelector('img').style.transform = 'rotate(40deg)';
+  baby.style.setProperty('--care', 0);
+  room.dataset.care = ''; room.style.setProperty('--scene-care', 0);
+  $('thought').style.left = '60%';
+}
+
+function renderCatEvent(storyVisible) {
+  const root = $('cat-event'), room = document.querySelector('.room'), clean = $('clean-soil');
+  const visible = model.levelId === 2 && !storyVisible && model.status !== 'ready';
+  root.hidden = !visible;
+  document.querySelector('.plant-patch').toggleAttribute('hidden', !visible);
+  room.dataset.cleaning = String(visible && model.cleaning);
+  room.dataset.cleanupCrying = String(model.cleaning && model.mood === 'crying');
+  document.querySelectorAll('.cleanup-tears i').forEach((tear, i) => {
+    const phase = ((model.elapsed / 650) + i * .5) % 1;
+    tear.style.opacity = 1 - phase;
+    tear.style.transform = 'translateY(' + (phase * 12) + 'px) rotate(25deg)';
+  });
+  clean.hidden = !visible || !model.dirty || model.status !== 'playing';
+  clean.disabled = gameClock.paused || Boolean(model.action) || model.cleaning;
+  clean.style.transform = model.elapsed - model.blockedAt < 1200 ? 'scale(' + (1 + .13 * Math.sin((model.elapsed - model.blockedAt) / 90) ** 2) + ')' : 'none';
+  const age = model.elapsed - model.catStarted;
+  const cat = document.querySelector('.event-cat');
+  cat.hidden = !visible || model.catState !== 'running' || model.status !== 'playing';
+  // Сначала спускаемся слева от мамы, затем пересекаем пол ниже её ног.
+  const path = [[0,-36,43],[CAT_HIT_MS,12.2,43],[1300,16,72],[2300,82,72],[CAT_RUN_MS,114,50]];
+  const segment = path.findIndex((point,i) => i < path.length-1 && age <= path[i+1][0]);
+  const index = segment < 0 ? path.length-2 : segment;
+  const from = path[index], to = path[index+1];
+  const step = Math.max(0,Math.min(1,(age-from[0])/(to[0]-from[0])));
+  const blend = step*step*(3-2*step);
+  cat.style.left = (from[1]+(to[1]-from[1])*blend)+'%';
+  cat.style.top = (from[2]+(to[2]-from[2])*blend)+'%';
+  cat.style.transform = 'translateY(' + (Math.sin(age / 100) * 3) + 'px) rotate(' + (Math.sin(age / 130) * 3) + 'deg)';
+  const fall = model.dirty ? Math.max(0, Math.min(1, (age - CAT_HIT_MS) / 600)) : 0;
+  const cleanupAge = model.elapsed - model.cleanupStarted;
+  const collected = model.cleaning ? Math.max(0, Math.min(1, (cleanupAge - 450) / 1150)) : 0;
+  const restore = model.cleaning ? Math.max(0, Math.min(1, (cleanupAge - 1600) / 400)) : 0;
+  const restoreEase = restore * restore * (3 - 2 * restore);
+  root.querySelector('.event-plant').style.transform = 'rotate(' + (-fall * 78 * (1-restoreEase)) + 'deg)';
+  const soil = root.querySelector('.spilled-soil');
+  soil.style.opacity = model.dirty ? fall * (1 - collected) : 0;
+  soil.style.transformOrigin = model.cleaning ? '95% 65%' : '20% 60%';
+  soil.style.transform = 'scale(' + ((.2 + .8 * fall) * (1 - collected * .7)) + ')';
+  const tools = document.querySelector('.cleaning-tools');
+  tools.toggleAttribute('hidden', !visible || !model.cleaning);
+  const sweeping = cleanupAge >= 350 && cleanupAge < 1650;
+  tools.style.opacity = sweeping ? Math.max(0,Math.min(1,(1650-cleanupAge)/150)) : 0;
+  // Совок остаётся у земли; только щётка сгребает землю в его сторону.
+  const sweep = sweeping ? (1 - Math.cos((cleanupAge - 350) / 210 * Math.PI * 2)) / 2 : 0;
+  tools.querySelector('.cleanup-brush').setAttribute('transform', 'translate(' + (sweep * 38) + ',0) rotate(' + (-8 + sweep * 12) + ' 60 13)');
+  tools.querySelector('.pan-soil').style.opacity = collected;
+}
+
 
 
 // Единственная шкала времени также управляет новым двухсекундным действием.
@@ -492,14 +642,14 @@ function updateLevelCards() {
   $('level2-icon').textContent = unlocked ? '2' : '🔒';
 }
 function openLevels() {
-  if (model.status === 'playing') return;
+  if (story || model.status === 'playing') return;
   stopFrame(); gameClock.pause(); menuView = 'levels';
   $('overlay').hidden = true; $('levels-overlay').hidden = false;
   updateLevelCards(); $('choose-level-1').focus();
 }
 
 function schedule() {
-  if (frame !== null || model.status !== 'playing' || gameClock.paused) return;
+  if (frame !== null || (story ? storyClock.paused : model.status !== 'playing' || gameClock.paused)) return;
   const currentGeneration = generation;
   frame = requestAnimationFrame(() => {
     if (currentGeneration !== generation) return;
@@ -507,16 +657,141 @@ function schedule() {
   });
 }
 function tick() {
+  if (story) {
+    if (storyClock.paused) return;
+    if (storyClock.read() >= STORY_MS) {
+      const kind = story.kind; story = null; storyClock.pause();
+      if (kind === 'intro') { startGameplay(model.levelId); return; }
+      outroCompleted = true;
+    }
+    render(); schedule(); return;
+  }
   if (model.status !== 'playing' || gameClock.paused) return;
   model.update(elapsedNow()); render(); schedule();
 }
 function stopFrame() { generation++; if (frame !== null) cancelAnimationFrame(frame); frame = null; }
+function beginStory(kind) {
+  stopFrame(); gameClock.pause(); story = {kind}; storyClock.reset();
+  if (kind === 'outro') gameClock.elapsed = TOTAL_HOURS * HOUR_MS;
+  $('overlay').hidden = true; $('pause-overlay').hidden = true;
+  if (document.hidden || !document.hasFocus()) storyClock.pause();
+  schedule();
+}
 function start(levelId = model.levelId) {
+  levelId = Number(levelId);
+  if (!progress.canStart(levelId)) return false;
+  stopFrame(); story = null; outroCompleted = false; menuView = 'title';
+  model.levelId = levelId; model.reset(); model.status = 'intro';
+  gameClock.reset(); gameClock.pause(); applyLevelAppearance();
+  screenStatus = 'intro'; familyState = ''; lastHour = -1;
+  $('levels-overlay').hidden = true; $('overlay').classList.remove('ended');
+  $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
+  beginStory('intro'); render();
+}
+function pauseStory() {
+  if (!story || storyClock.paused) return;
+  storyClock.pause(); stopFrame(); render();
+}
+function resumeStory() {
+  if (!story || !storyClock.paused || document.hidden || !document.hasFocus()) return;
+  storyClock.resume(); render(); schedule();
+}
+function storyFeedback(kind, age) {
+  age *= 4000 / STORY_MS;
+  return kind === 'outro' ? (age < 1700 ? 'storyReturn' : 'storyHug') :
+    age < 450 ? 'storyMorning' : age < 1600 ? 'storyKiss' : age < 2700 ? 'storyWave' : 'storyLeave';
+}
+function renderStoryScene(kind, elapsed) {
+  const age = Math.min(STORY_MS, elapsed) * 4000 / STORY_MS;
+  const ease = x => {x = Math.max(0, Math.min(1, x)); return x*x*(3-2*x);};
+  const family = $('family'), room = document.querySelector('.room'), dad = $('dad');
+  // Смена позы выполняется затуханием ниже; стоячий силуэт не деформируется.
+  const rise = 1;
+  family.style.left = (28 + 12 * rise) + '%'; family.style.top = '25%';
+  family.querySelector('.family-visual').style.transform = 'none';
+  family.querySelectorAll('.family-visual > img').forEach(img => {img.style.opacity = 0;});
+  const mother = family.querySelector('.family-standing');
+  const seated = family.querySelector('.family-seated');
+  seated.style.opacity = 0; seated.style.scale = '1';
+  // Выпрямляем ноги у пола, поднимая верх тела без изменения размера головы.
+  const legScale = .55 + .97 * rise;
+  const lift = (1.52 - legScale) * .36 * family.clientHeight;
+  const upperTransform = 'translateY(' + lift + 'px) scale(-1.52, 1.52)';
+  mother.style.opacity = 1; mother.style.scale = '1'; mother.style.transform = upperTransform;
+  mother.style.clipPath = rise < 1 ? 'inset(0 0 40% 0)' : 'none';
+  const legs = family.querySelector('.story-rising-legs');
+  legs.style.opacity = rise < 1 ? 1 : 0;
+  legs.style.transform = 'scale(-1.52,' + legScale + ')';
+  family.querySelector('.care-effects').style.opacity = 0;
+  document.querySelector('.independent-baby').style.opacity = 0;
+  document.querySelector('.play-baby').style.opacity = 0;
+  document.querySelector('.table-bottle').style.opacity = 1;
+  room.dataset.care = ''; room.style.setProperty('--scene-care', 0);
+  const pose = {standing:0,kiss:0,wave:0,back:0,hug:0};
+  let left = 16, bob = 0, wave = 0, affection = 0, smile = 1;
+  if (kind === 'intro') {
+    const kiss = ease((age - 350) / 600), goodbye = ease((age - 1500) / 400), turn = ease((age - 2600) / 300);
+    pose.standing = 1 - kiss; pose.kiss = kiss * (1 - goodbye);
+    pose.wave = goodbye * (1 - turn); pose.back = turn;
+    left -= 4 * pose.kiss + 80 * ease((age - 2900) / 1100);
+    wave = Math.sin(age / 90) * pose.wave * 1.2;
+    bob = age > 2900 ? Math.sin(age / 85) * turn * 1.5 : 0;
+    affection = ease((age - 850) / 150) * (1 - ease((age - 1350) / 250));
+  } else {
+    const enter = ease(age / 1300), hug = ease((age - 1300) / 700);
+    pose.standing = 1 - hug; pose.hug = hug;
+    left = -64 + 82 * enter;
+    bob = Math.sin(age / 85) * (1 - enter) * 1.5;
+    affection = ease((age - 1750) / 450);
+  }
+  dad.hidden = false; dad.style.left = left + '%';
+  dad.style.transform = 'translateY(' + bob + 'px) rotate(' + wave + 'deg)';
+  dad.querySelectorAll('[data-dad-pose]').forEach(img => {img.style.opacity = pose[img.dataset.dadPose];});
+  const arm = document.querySelector('.story-hug-arm'); arm.hidden = kind !== 'outro';
+  arm.style.left = left + '%'; arm.style.opacity = pose.hug;
+  arm.style.transform = dad.style.transform;
+  const babySmile = document.querySelector('.story-standing-smile');
+  babySmile.style.opacity = smile; babySmile.style.transform = upperTransform;
+  const babyFront = document.querySelector('.story-baby-front');
+  babyFront.hidden = false; babyFront.style.left = family.style.left; babyFront.style.opacity = 1;
+  babyFront.querySelector('img').style.transform = upperTransform;
+  if (kind === 'outro') {
+    const standingPose = age >= 850;
+    const visibility = standingPose ? ease((age - 850) / 400) : 1 - ease((age - 450) / 400);
+    mother.style.opacity = standingPose ? visibility : 0;
+    babySmile.style.opacity = standingPose ? visibility : 0;
+    babyFront.style.opacity = standingPose ? visibility : 0;
+    if (!standingPose) {
+      family.style.left = '28%';
+      seated.style.opacity = visibility;
+      seated.style.transform = 'none';
+    }
+  }
+  // В конце утра меняем позу только в невидимой середине телепортации.
+  // Обе половины используют сюжетные часы, поэтому замерзают вместе со сценой.
+  if (kind === 'intro' && age >= 3280) {
+    const seatedPose = age >= 3640;
+    const visibility = seatedPose ? ease((age - 3640) / 360) : 1 - ease((age - 3280) / 360);
+    mother.style.opacity = seatedPose ? 0 : visibility;
+    babySmile.style.opacity = seatedPose ? 0 : visibility;
+    babyFront.style.opacity = seatedPose ? 0 : visibility;
+    legs.style.opacity = 0;
+    if (seatedPose) {
+      family.style.left = '28%';
+      seated.style.opacity = visibility;
+      seated.style.transform = 'none';
+    }
+  }
+  const heart = document.querySelector('.story-affection'); heart.hidden = false;
+  heart.style.opacity = affection; heart.style.transform = 'translateY(' + (-4 * Math.sin(age / 400)) + 'px)';
+}
+function startGameplay(levelId = model.levelId) {
   levelId = Number(levelId);
   if (!progress.canStart(levelId)) return false;
   menuView = 'title';
   $('levels-overlay').hidden = true;
-  stopFrame(); gameClock.reset(); screenStatus = 'playing'; familyState = ''; lastHour = -1;
+  stopFrame(); story = null; storyClock.pause(); outroCompleted = false;
+  gameClock.reset(); screenStatus = 'playing'; familyState = ''; lastHour = -1;
   model.start(levelId); applyLevelAppearance(); $('overlay').hidden = true; $('overlay').classList.remove('ended');
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
   // Новая партия также начинает визуальные анимации с начала.
@@ -527,6 +802,7 @@ function start(levelId = model.levelId) {
   if (document.hidden || !document.hasFocus()) pause(); else schedule();
 }
 function pause() {
+  if (story) { pauseStory(); return; }
   if (model.status !== 'playing' || gameClock.paused) return;
   gameClock.pause(); model.update(elapsedNow()); stopFrame();
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false; render();
@@ -535,7 +811,8 @@ function pause() {
 function returnToTitle() {
   if (model.status === 'playing' && !gameClock.paused) return;
   menuView = 'title'; $('levels-overlay').hidden = true;
-  stopFrame(); model.levelId = 1; model.reset(); applyLevelAppearance(); gameClock.reset(); gameClock.pause();
+  stopFrame(); story = null; storyClock.pause(); outroCompleted = false;
+  model.levelId = 1; model.reset(); applyLevelAppearance(); gameClock.reset(); gameClock.pause();
   screenStatus = 'ready'; familyState = ''; lastHour = -1;
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
   $('overlay').hidden = false; $('overlay').classList.remove('ended');
@@ -549,6 +826,10 @@ buttons.forEach(button => button.addEventListener('click', () => {
   if (gameClock.paused || model.status !== 'playing') return;
   model.answer(button.dataset.action, elapsedNow()); render();
 }));
+$('clean-soil').addEventListener('click', () => {
+  if (gameClock.paused || model.status !== 'playing' || story) return;
+  model.cleanup(elapsedNow()); render();
+});
 $('start').addEventListener('click', () => start(model.status === 'ready' ? 1 : model.levelId));
 $('open-levels').addEventListener('click', openLevels);
 $('levels-back').addEventListener('click', returnToTitle);
@@ -569,9 +850,10 @@ $('cancel-restart').addEventListener('click', () => {
 $('confirm-start').addEventListener('click', () => {
   if (gameClock.paused && !$('confirm-restart').hidden) start();
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); else resumeStory(); });
 window.addEventListener('blur', pause);
 window.addEventListener('pagehide', pause);
+window.addEventListener('focus', resumeStory);
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape' || model.status !== 'playing') return;
   if (!gameClock.paused) pause();
@@ -603,6 +885,7 @@ function updateLocalizedState() {
     $('start').textContent = t('restart');
     document.querySelector('.card-note').textContent = t(result === 'won' && model.levelId === 1 ? 'unlocked' : result + 'Note');
   }
+  if (story) $('message').textContent = t(storyFeedback(story.kind, storyClock.read()));
 }
 function applyLanguage() {
   document.documentElement.lang = language;

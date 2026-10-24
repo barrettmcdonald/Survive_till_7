@@ -113,3 +113,47 @@ header{padding:7px 16px 8px;border-radius:0 0 18px 18px}.brand{min-height:35px;m
 
 
 .growing-care-bottle{position:absolute;width:7%;aspect-ratio:1241/1268;object-fit:contain;transform:rotate(-50deg);opacity:0;pointer-events:none;z-index:9}
+
+/* Сюжетные персонажи: исходная мама и малыш остаются прежними. */
+.story-dad{position:absolute;left:8%;top:5%;width:50%;aspect-ratio:2/3;z-index:8;pointer-events:none;transform-origin:50% 96%}
+.story-dad>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;user-select:none}
+.story-baby-front{position:absolute;left:40%;top:25%;width:46%;aspect-ratio:1214/1295;z-index:9;pointer-events:none}
+.story-baby-front>img{width:100%;height:100%;object-fit:contain;object-position:center bottom;clip-path:ellipse(10% 6% at 70% 39%);transform:scale(-1.52,1.52);transform-origin:50% 96%}
+.story-hug-arm{position:absolute;left:8%;top:5%;width:50%;aspect-ratio:2/3;z-index:8;pointer-events:none}
+.story-hug-arm>img{width:100%;height:100%;object-fit:contain;clip-path:polygon(70% 46%,100% 46%,100% 58%,70% 58%)}
+.story-standing-smile{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;opacity:0;clip-path:ellipse(10% 6% at 70% 39%);transform:scale(-1.52,1.52);transform-origin:50% 96%;pointer-events:none}
+.story-rising-legs{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;opacity:0;transform-origin:50% 96%;pointer-events:none}
+.story-rising-legs{clip-path:inset(59.8% 0 0)}
+.story-affection{position:absolute;left:56%;top:4%;z-index:8;color:#d98f85;font-size:clamp(18px,6vw,28px);pointer-events:none}
+.is-story .touch-marker{display:none}.is-story .family-seated{animation:none}
+/* Кошачья проделка второго уровня: всё движение задают игровые часы. */
+#cat-event{position:absolute;inset:0;z-index:3;pointer-events:none}
+.plant-patch{position:absolute;left:calc(100% * 230 / 1024);top:calc(100% * 373 / 1211);width:calc(100% * 160 / 1024);height:calc(100% * 220 / 1211);overflow:hidden}
+.event-plant{position:absolute;left:22.3%;top:30.8%;width:15%;height:17.5%;object-fit:fill;transform-origin:65% 95%;will-change:transform}
+.event-cat{position:absolute;top:43%;width:20%;height:auto;will-change:left,transform}
+.spilled-soil{position:absolute;left:24%;top:46%;width:24%;height:7%;background:radial-gradient(ellipse at 20% 60%,#75533a 0 5%,transparent 6%),radial-gradient(ellipse at 40% 45%,#856348 0 16%,transparent 17%),radial-gradient(ellipse at 63% 67%,#735137 0 13%,transparent 14%),radial-gradient(ellipse at 80% 30%,#987252 0 5%,transparent 6%),radial-gradient(ellipse at 91% 79%,#79583e 0 3%,transparent 4%);transform-origin:20% 60%}
+.clean-soil{position:absolute;left:31%;top:53%;max-width:35%;min-height:40px;padding:7px 10px;border:2px solid #faf4e6;border-radius:15px;background:#91aa8c;color:#fffdf6;box-shadow:0 3px 0 #637f6266;z-index:11;font-size:12px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.clean-soil:disabled{cursor:default;opacity:.65}.cleaning-tools{position:absolute;width:15%;left:24%;top:43%;z-index:8;transform-origin:50% 80%}
+.illustrated-room[data-cleaning="true"] .family-empty{transform-origin:50% 90%}
+.cleaning-tools{left:31%;top:46%;width:22%;height:auto;pointer-events:none}
+.illustrated-room[data-cleaning="true"] #cat-event{z-index:3}
+.cleanup-tears{display:none;position:absolute;inset:0;transform:rotate(40deg);pointer-events:none}
+.illustrated-room[data-cleaning="true"][data-cleanup-crying="true"] .cleanup-tears{display:block}
+.cleanup-tears i{position:absolute;left:53%;top:31%;width:7px;height:13px;border-radius:0 65% 65% 65%;background:linear-gradient(135deg,#def9ff,#73c4e3);box-shadow:inset 1px 1px #edffff}
+.cleanup-tears i:nth-child(2){left:75%;top:43%}
+/* Уборка у горшка: инструменты касаются пола, кнопка не закрывает щётку. */
+.cleaning-tools{top:45%;transform:scaleY(.65);transform-origin:50% 0}
+.illustrated-room[data-cleaning="true"] .clean-soil{left:7%;top:55%}
+/* Земля и горшок перед персонажами; заплатка стены остаётся на заднем плане. */
+.plant-patch{z-index:3;pointer-events:none}
+#cat-event,.illustrated-room[data-cleaning="true"] #cat-event{z-index:8}
+.clean-soil,.illustrated-room[data-cleaning="true"] .clean-soil{left:28%;top:44%;width:20%;height:12%;max-width:none;min-width:44px;min-height:44px;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;color:inherit}
+.clean-soil .touch-marker{left:50%;top:50%}
+.clean-soil:disabled{opacity:1}
+.event-cat{z-index:8;pointer-events:none}
+.spilled-soil{background:radial-gradient(ellipse at 42% 57%,#806044 0 26%,transparent 28%),radial-gradient(ellipse at 64% 67%,#735137 0 17%,transparent 19%),radial-gradient(ellipse at 20% 64%,#75533a 0 7%,transparent 9%),radial-gradient(ellipse at 81% 32%,#987252 0 6%,transparent 8%),radial-gradient(ellipse at 94% 79%,#79583e 0 4%,transparent 6%)}
+/* Земля лежит слева от мамы; фоновые предметы не рисуются поверх персонажей. */
+#cat-event,.illustrated-room[data-cleaning="true"] #cat-event{z-index:7}
+.spilled-soil{left:23%;width:17%}
+.cleaning-tools{left:23%}
+.clean-soil,.illustrated-room[data-cleaning="true"] .clean-soil{left:24%;top:44%;width:17%}
