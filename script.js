@@ -6,6 +6,8 @@ const TOTAL_HOURS = 12;
 const STORY_MS = 5000;
 const CAT_RUN_MS = 2800;
 const CAT_HIT_MS = 900;
+// Малыш лежит на верхней плоскости матраса, за передними перекладинами.
+const CRIB_BABY = {x: .77, y: .29, width: .185};
 // Централизованные тексты. Модель хранит ключи, а не переведённые сообщения.
 const TRANSLATIONS = {
   "ru": {
@@ -511,8 +513,8 @@ function renderScene() {
   const fw = room.clientWidth * 0.46, fh = fw * 1295 / 1214;
   const heldX = (28 + dx * travel) / 100 * room.clientWidth + fw * (mirror < 0 ? 0.08 : 0.48);
   const heldY = (25 + dy * travel) / 100 * room.clientHeight + fh * (0.4104 - 0.4232 * pose) + bob;
-  const targetX = room.clientWidth * (model.action === 'sleep' ? 0.76 : 0.015);
-  const targetY = room.clientHeight * (model.action === 'sleep' ? 0.34 : 0.24);
+  const targetX = room.clientWidth * (model.action === 'sleep' ? CRIB_BABY.x : 0.015);
+  const targetY = room.clientHeight * (model.action === 'sleep' ? CRIB_BABY.y : 0.24);
   // После подхода малыш сразу появляется внутри предмета, без пролёта по дуге.
   // Перед возвращением мамы он так же мгновенно оказывается у неё на руках.
   const inFurniture = (model.action === 'sleep' || model.action === 'wash') && age >= 600 && age < 1520;
@@ -560,7 +562,7 @@ function renderCleanupScene() {
   document.querySelector('.growing-care-bottle').style.opacity = 0;
   document.querySelector('.table-bottle').style.opacity = 1;
   const baby = document.querySelector('.independent-baby');
-  baby.style.left = '76%'; baby.style.top = '34%'; baby.style.width = '18.5%'; baby.style.opacity = returning ? 0 : fadeOut; baby.style.zIndex = 5;
+  baby.style.left = (CRIB_BABY.x*100)+'%'; baby.style.top = (CRIB_BABY.y*100)+'%'; baby.style.width = (CRIB_BABY.width*100)+'%'; baby.style.opacity = returning ? 0 : fadeOut; baby.style.zIndex = 5;
   baby.dataset.depth = 'inside'; baby.querySelector('img').style.transform = 'rotate(40deg)';
   baby.style.setProperty('--care', 0);
   room.dataset.care = ''; room.style.setProperty('--scene-care', 0);
