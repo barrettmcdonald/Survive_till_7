@@ -160,3 +160,8 @@ header{padding:7px 16px 8px;border-radius:0 0 18px 18px}.brand{min-height:35px;m
 .music-toggle{position:fixed;top:max(4px,env(safe-area-inset-top));right:max(106px,calc((100vw - 480px)/2 + 106px));z-index:30;width:38px;height:38px;padding:0;border:1px solid #e9dfd2;border-radius:12px;background:#fffcf5;color:#968477;display:grid;place-items:center;font-size:19px;line-height:1}
 .music-toggle[aria-pressed="true"]{background:#8fa38a;border-color:#8fa38a;color:#fff}
 .brand{padding-right:146px}
+/* Объятие: рукав за плечами мамы, кисть на дальнем плече. */
+.story-dad [data-dad-pose="hug"]{clip-path:polygon(0 0,100% 0,100% 28%,58% 28%,61% 32%,65% 38%,68% 42%,100% 42%,100% 100%,0 100%)}
+.story-hug-back{position:absolute;left:18%;top:5%;width:50%;aspect-ratio:2/3;z-index:6;pointer-events:none}
+.story-hug-back>img{width:100%;height:100%;object-fit:contain;clip-path:polygon(60% 28%,96% 28%,96% 41%,60% 41%);transform-origin:62% 31%;transform:rotate(15deg) scaleX(1.55)}
+.story-hug-arm>img{clip-path:polygon(85% 29%,94% 29%,94% 38%,84% 38%,83% 33%);transform-origin:62% 31%;transform:translate(13.8%,2.5%) rotate(15deg)}

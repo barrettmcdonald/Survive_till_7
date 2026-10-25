@@ -410,6 +410,7 @@ function render() {
   else {
     $('dad').hidden = true;
     document.querySelector('.story-hug-arm').hidden = true;
+    document.querySelector('.story-hug-back').hidden = true;
     document.querySelector('.story-baby-front').hidden = true;
     document.querySelector('.story-affection').hidden = true;
     document.querySelector('.story-standing-smile').style.opacity = 0;
@@ -787,9 +788,12 @@ function renderStoryScene(kind, elapsed) {
   dad.hidden = false; dad.style.left = left + '%';
   dad.style.transform = 'translateY(' + bob + 'px) rotate(' + wave + 'deg)';
   dad.querySelectorAll('[data-dad-pose]').forEach(img => {img.style.opacity = pose[img.dataset.dadPose];});
-  const arm = document.querySelector('.story-hug-arm'); arm.hidden = kind !== 'outro';
-  arm.style.left = left + '%'; arm.style.opacity = pose.hug;
-  arm.style.transform = dad.style.transform;
+  // Плечо и рукав проходят за мамой, кисть лежит поверх её дальнего плеча.
+  for (const selector of ['.story-hug-back','.story-hug-arm']) {
+    const arm = document.querySelector(selector); arm.hidden = kind !== 'outro';
+    arm.style.left = left + '%'; arm.style.opacity = pose.hug;
+    arm.style.transform = dad.style.transform;
+  }
   const babySmile = document.querySelector('.story-standing-smile');
   babySmile.style.opacity = smile; babySmile.style.transform = upperTransform;
   const babyFront = document.querySelector('.story-baby-front');
