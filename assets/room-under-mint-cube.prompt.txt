@@ -1,0 +1,4 @@
+Generated with the built-in image generation tool. Source: assets/room.png.
+Only the mint cube footprint is used by the game; the rest of this generated image is never rendered.
+
+Edit target: the attached nursery background. Precise object removal for a game asset. Remove ONLY the small mint/turquoise cube on the floor near the lower right, immediately in front of the lavender cube and left of the teddy bear (mint cube approx x711..783 y1284..1349 in 1024x1536 image). Reconstruct the warm peach wooden floor hidden directly under that mint cube and its tiny shadow, matching the existing floor lighting and gentle diagonal sunlit bands exactly. Leave the lavender cube, teddy, all other furniture, plants, rug, colors, geometry, texture, canvas size and every other pixel as unchanged as possible. No new objects. Output same 1024x1536 portrait background.
