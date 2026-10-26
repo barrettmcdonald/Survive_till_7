@@ -120,7 +120,7 @@ header{padding:7px 16px 8px;border-radius:0 0 18px 18px}.brand{min-height:35px;m
 .story-baby-front{position:absolute;left:40%;top:25%;width:46%;aspect-ratio:1214/1295;z-index:9;pointer-events:none}
 .story-baby-front>img{width:100%;height:100%;object-fit:contain;object-position:center bottom;clip-path:ellipse(10% 6% at 70% 39%);transform:scale(-1.52,1.52);transform-origin:50% 96%}
 .story-hug-arm{position:absolute;left:8%;top:5%;width:50%;aspect-ratio:2/3;z-index:8;pointer-events:none}
-.story-hug-arm>img{width:100%;height:100%;object-fit:contain;clip-path:polygon(70% 46%,100% 46%,100% 58%,70% 58%)}
+.story-hug-arm>img{width:100%;height:100%;object-fit:contain;clip-path:polygon(65% 43%,100% 43%,100% 59%,65% 59%)}
 .story-standing-smile{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;opacity:0;clip-path:ellipse(10% 6% at 70% 39%);transform:scale(-1.52,1.52);transform-origin:50% 96%;pointer-events:none}
 .story-rising-legs{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;opacity:0;transform-origin:50% 96%;pointer-events:none}
 .story-rising-legs{clip-path:inset(59.8% 0 0)}
@@ -161,7 +161,57 @@ header{padding:7px 16px 8px;border-radius:0 0 18px 18px}.brand{min-height:35px;m
 .music-toggle[aria-pressed="true"]{background:#8fa38a;border-color:#8fa38a;color:#fff}
 .brand{padding-right:146px}
 /* Объятие: рукав за плечами мамы, кисть на дальнем плече. */
-.story-dad [data-dad-pose="hug"]{clip-path:polygon(0 0,100% 0,100% 28%,58% 28%,61% 32%,65% 38%,68% 42%,100% 42%,100% 100%,0 100%)}
+.story-dad [data-dad-pose="hug"]{clip-path:polygon(0 0,100% 0,100% 28%,58% 28%,61% 32%,65% 38%,68% 42%,100% 42%,100% 43%,65% 43%,65% 59%,100% 59%,100% 100%,0 100%)}
 .story-hug-back{position:absolute;left:18%;top:5%;width:50%;aspect-ratio:2/3;z-index:6;pointer-events:none}
-.story-hug-back>img{width:100%;height:100%;object-fit:contain;clip-path:polygon(60% 28%,96% 28%,96% 41%,60% 41%);transform-origin:62% 31%;transform:rotate(15deg) scaleX(1.55)}
-.story-hug-arm>img{clip-path:polygon(85% 29%,94% 29%,94% 38%,84% 38%,83% 33%);transform-origin:62% 31%;transform:translate(13.8%,2.5%) rotate(15deg)}
+.story-hug-back>img{width:100%;height:100%;object-fit:contain;clip-path:polygon(60% 28%,78% 28%,78% 41%,60% 41%);transform-origin:62% 31%;transform:rotate(15deg) scaleX(1.55)}
+.story-hug-hand{position:absolute;left:92%;top:36.5%;width:13%;height:auto;overflow:visible;transform:rotate(8deg);transform-origin:85% 8%}
+.story-hug-back>.story-hug-hand{display:none}
+.story-dad [data-dad-pose="kiss"]{clip-path:polygon(0 0,100% 0,100% 37%,55% 37%,55% 48%,100% 48%,100% 100%,0 100%)}
+.story-hug-back[data-scene="intro"]>img{clip-path:polygon(54% 36.5%,100% 36.5%,100% 48.5%,54% 48.5%);transform:none}
+/* Третий уровень: отдельный малыш и существующая дверца под раковиной. */
+#explorer-baby{position:absolute;aspect-ratio:200/220;margin:0;padding:0;background:none;border:0;box-shadow:none;pointer-events:auto;transform-origin:50% 70%;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#explorer-baby:focus-visible{outline:2px solid #fffdf1;border-radius:35%}
+#explorer-baby:disabled{cursor:default}
+#explorer-baby>svg{display:block;width:100%;height:100%;overflow:visible}
+#explorer-baby>.explorer-reference-art{position:absolute;inset:0;overflow:hidden;pointer-events:none;transform-origin:50% 93%;z-index:1}
+.skin-palette-defs{position:absolute;pointer-events:none;overflow:hidden}
+#explorer-baby>.explorer-reference-art{filter:url(#level3-skin-match)}
+.illustrated-room[data-level="3"] .family-toddler-hug{filter:url(#level3-hug-skin-match)}
+.explorer-crawl,.explorer-cry-mouth,.explorer-tears,.explorer-sleep-eyes,.explorer-sleep-smile,.explorer-cry-eyes{display:none}
+[data-pose="crawl"] .explorer-crawl{display:block}[data-pose="crawl"] .explorer-sit{display:none}
+[data-face="cry"] .explorer-tears,[data-face="cry"] .explorer-cry-mouth{display:block}
+[data-face="cry"] .explorer-smile{display:none}
+[data-face="cry"] .explorer-eyes{display:none}[data-face="cry"] .explorer-cry-eyes{display:block}
+[data-face="sleep"] .explorer-eyes{display:none}[data-face="sleep"] .explorer-sleep-eyes{display:block}
+[data-face="sleep"] .explorer-smile{display:none}[data-face="sleep"] .explorer-sleep-smile{display:block}
+.explorer-bottle{position:absolute;width:45%;height:60%;object-fit:contain;left:34.5%;top:43%;transform:rotate(-35deg);transform-origin:50% 10%;pointer-events:none;z-index:20}
+.explorer-zzz{position:absolute;right:10%;top:-12%;font-size:18px;color:#8b76a1;font-weight:700}
+.cabinet-scene{position:absolute;inset:0;z-index:7;pointer-events:none}
+.cabinet-interior,.cabinet-door{position:absolute;left:0;top:35.51%;width:21.48%;height:23.95%;overflow:hidden}
+.cabinet-door{transform-origin:0 50%;transform:perspective(500px) rotateY(var(--door-angle,0deg))}
+.levels-card{max-height:calc(100svh - 40px);overflow-y:auto}
+.illustrated-room[data-level="3"] .emotion-tears{display:none}
+.illustrated-room[data-level="3"][data-explorer-floor="true"] .care-foreground{z-index:5}
+.floor-toys-front{display:none;position:absolute;inset:0;width:100%;height:100%;z-index:9;pointer-events:none}
+.explorer-blocks{position:absolute;inset:0;width:100%;height:100%;z-index:10;pointer-events:none}
+.explorer-blocks[hidden]{display:none}
+.blocks-underlay{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none}
+.blocks-underlay[hidden]{display:none}
+.illustrated-room[data-level="3"] #floor-toys-clip>path:last-child{display:none}
+.milk-puddle{position:absolute;left:20%;top:78%;width:29%;height:5%;border-radius:48% 57% 45% 53%;background:#fff8e8;box-shadow:inset 0 -3px #e8d8b9,0 2px 2px #92674025;transform-origin:70% 50%}
+.milk-puddle i{position:absolute;background:#fff8e8;border-radius:50%;width:11%;height:28%;left:5%;top:-30%}.milk-puddle i:nth-child(2){left:83%;top:102%;width:7%}.milk-puddle i:nth-child(3){left:-9%;top:60%;width:5%}
+#table-cat-event{position:absolute;inset:0;z-index:11;pointer-events:none}
+.table-cat{position:absolute;width:20%;height:auto;transform-origin:50% 85%;pointer-events:none}
+.wipe-table{left:21%;top:74%;width:28%;height:13%;z-index:12;border-radius:50%}.wipe-table .touch-marker{left:60%;top:55%}
+.table-wipe-hand{position:absolute;left:21%;top:72%;width:22%;height:auto;z-index:12;pointer-events:none}
+.illustrated-room[data-table-dirty="true"] .table-bottle{transform:rotate(calc(-6deg - var(--bottle-fall,1)*76deg));transform-origin:50% 82%}
+.illustrated-room[data-level="3"] .floor-toys-front{display:block}
+.illustrated-room[data-level="3"][data-blocks-playing="true"] .floor-toys-front{z-index:7}
+.illustrated-room[data-level="3"][data-table-cleaning="true"] #cat-event{z-index:5}
+.explorer-target .touch-marker{left:50%;top:65%;z-index:3}
+.explorer-cabinet-pose{display:none}
+[data-pose="reach"] .explorer-sit{display:none}
+[data-pose="reach"] .explorer-cabinet-pose{display:block}
+[data-pose="reach"] .explorer-head>ellipse:first-child{opacity:0}
+.explorer-cradle-support{position:absolute;width:46%;aspect-ratio:1214/1295;z-index:9;pointer-events:none}
+.explorer-cradle-support>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;transform-origin:50% 96%;clip-path:polygon(53.5% 51.4%,56.5% 51%,57% 50.5%,60% 50.3%,61.5% 50.8%,64% 49.5%,66% 50.2%,66.5% 52%,63.5% 54%,59% 55.5%,55% 54.5%,53.5% 53%)}
