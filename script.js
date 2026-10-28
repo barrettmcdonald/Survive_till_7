@@ -15,6 +15,12 @@ const EXPLORER_BABY_SCALE = 1.25;
 const EXPLORER_START = {x:.8,y:.7};
 const EXPLORER_WASH_LANDING = {x:.3,y:.6};
 const EXPLORER_SLEEP_LANDING = {x:.84,y:.68};
+function cabinetDoorAngle(age){
+  const t=Math.max(0,age);
+  if(t<400){const p=t/400;return 46*p*p*(3-2*p);}
+  // Мягкое покачивание после открытия, с замедлением у крайних положений.
+  return 46-6*(1-Math.cos((t-400)/1000*Math.PI*2));
+}
 // Централизованные тексты. Модель хранит ключи, а не переведённые сообщения.
 const TRANSLATIONS = {
   "ru": {
@@ -31,6 +37,10 @@ const TRANSLATIONS = {
     "cabinetPlay": "Ох уж эта интересная дверца…",
     "blocksPlay": "Строим башенку!",
     "blocksFell": "Башенка упала!",
+    "coffeeEmpty": "Кружка пуста",
+    "coffee": "Выпить кофе · +1 сердечко",
+    "drinkingCoffee": "Маленький глоток для маминых нервов…",
+    "coffeeRestored": "Кофе помог! +1 сердечко ♡",
     "wonLevel3": "Ни секунды покоя — но вы справились! Папа дома. Осталось сердечек: {count}.",
     "unlocked3": "Третий уровень открыт! Малыша ждут новые открытия.",
     "musicOn": "Включить музыку",
@@ -100,6 +110,7 @@ const TRANSLATIONS = {
     "successSleep": "Тс-с… маленький сон, большая победа.",
     "react": "Помоги малышу — у тебя 2 секунды!",
     "late": "Время вышло. −1 сердечко. Малышу всё ещё нужна помощь!",
+    "stillCrying": "Малыш всё ещё плачет. −1 сердечко. Помоги ему!",
     "wrong": "Нужен другой предмет! −1 сердечко. Попробуй ещё.",
     "calm": "Малыш спокоен. Можно немного выдохнуть.",
     "helping": "",
@@ -143,6 +154,10 @@ const TRANSLATIONS = {
     "cabinetPlay": "That cupboard door is very interesting…",
     "blocksPlay": "Let's build a tower!",
     "blocksFell": "My tower fell down!",
+    "coffeeEmpty": "The mug is empty",
+    "coffee": "Have some coffee · +1 heart",
+    "drinkingCoffee": "A little sip for Mom's nerves…",
+    "coffeeRestored": "Coffee to the rescue! +1 heart ♡",
     "wonLevel3": "Not a moment's peace, but you made it! Dad's home. Mom has {count} hearts left.",
     "unlocked3": "Level 3 unlocked! More little adventures await.",
     "musicOn": "Turn music on",
@@ -212,6 +227,7 @@ const TRANSLATIONS = {
     "successSleep": "Shh… one small nap, one big win.",
     "react": "Baby needs you—quick, you have 2 seconds!",
     "late": "Time’s up! −1 heart. Baby still needs your help!",
+    "stillCrying": "Baby is still crying. −1 heart. Help them out!",
     "wrong": "Oops, try another item! −1 heart. You can still fix it.",
     "calm": "Baby’s happy. Take a little breather.",
     "helping": "",
@@ -286,6 +302,7 @@ class GameModel {
   reset() {
     this.status = 'ready'; this.hearts = 5; this.hour = -1; this.elapsed = 0;
     this.pending = false; this.need = null; this.events = 0; this.feedback = 'ready'; this.mood = '';
+    this.cryPenaltyAt = Infinity;
     this.timeoutApplied = false; this.action = null; this.actionStarted = 0; this.actionEnd = Infinity;
     this.losses = []; this.lastNeedAction = null; this.needStreak = 0;
     this.seenNeeds = new Set();
@@ -296,14 +313,14 @@ class GameModel {
     this.blockedAt = -Infinity;
     this.tableCatAt=Infinity;this.tableCatState='waiting';this.tableCatStarted=0;
     this.tableHitAt=Infinity;this.tableCatEnd=Infinity;this.tableDirty=false;this.tableBlockedAt=-Infinity;this.tableCatFromFloor=false;
-    this.cleanupKind='soil';
+    this.cleanupKind='soil';this.coffeeDrinks=0;
     this.explorer = null;
   }
   start(levelId = this.levelId) {
     if (!Object.hasOwn(LEVELS, levelId)) throw new RangeError('Unknown level');
     this.levelId = Number(levelId); this.reset(); this.status = 'playing';
     if(this.levelId>=2)this.tableCatAt=TABLE_CAT_AT;
-    if(this.levelId===3){this.hour=0;this.feedback='exploring';this.explorer=new ExplorerDay(this.random);this.catAt=12000+this.random()*36000;return;}
+    if(this.levelId===3){this.hour=0;this.feedback='exploring';this.explorer=new ExplorerDay(this.random);this.catAt=12000+this.random()*(TABLE_CAT_AT-HOUR_MS-CAT_RUN_MS-12000);return;}
     this.newHour(0);
     if (this.levelId === 1) this.catAt = 50000; // 15:20 каждого дня.
     if (this.levelId === 2) this.catAt = 2 * HOUR_MS; // 09:00 каждого дня.
@@ -321,13 +338,13 @@ class GameModel {
     this.seenNeeds.add(need.action);
     this.needStreak = need.action === this.lastNeedAction ? this.needStreak + 1 : 1;
     this.lastNeedAction = need.action;
-    if (this.action) { this.queuedNeed = need; return; }
+    if (this.action || this.pending) { this.queuedNeed = need; return; }
     this.showNeed(need);
   }
   showNeed(need) {
     this.need = need; this.queuedNeed = null;
     this.needShownAt = this.elapsed;
-    this.pending = true; this.timeoutApplied = false;
+    this.pending = true; this.timeoutApplied = false; this.cryPenaltyAt = Infinity;
     this.feedback = 'react'; this.mood = '';
   }
   win() {
@@ -371,12 +388,17 @@ class GameModel {
       if(next===this.catEnd){this.catState='gone';this.catEnd=Infinity;}
     }
   }
-  fail(late) {
+  fail(late, repeated = false) {
     if (this.status !== 'playing' || !this.pending || this.action) return;
     if (late) { if (this.timeoutApplied) return; this.timeoutApplied = true; }
+    if(this.cryPenaltyAt===Infinity)this.cryPenaltyAt=this.elapsed+HOUR_MS;
     this.hearts--; this.losses.push({ index: this.hearts, at: this.elapsed }); this.mood = 'crying';
-    this.feedback = late ? 'late' : 'wrong';
+    this.feedback = repeated ? 'stillCrying' : late ? 'late' : 'wrong';
     if (this.hearts === 0) { this.status = 'lost'; this.action = null; this.actionEnd = Infinity; this.cleaning = false; this.cleanupEnd = Infinity; }
+  }
+  repeatCryPenalty() {
+    this.cryPenaltyAt += HOUR_MS;
+    this.fail(false, true);
   }
   update(elapsed) {
     if (this.levelId===3 && this.explorer) { this.explorer.update(elapsed,this); return; }
@@ -388,7 +410,8 @@ class GameModel {
       const hourAt = this.dayEnded ? Infinity : (this.hour + 1) * HOUR_MS;
       const timeoutAt = this.pending && !this.timeoutApplied ? this.needShownAt + RESPONSE_MS : Infinity;
       const catAt = this.catState === 'waiting' && (this.levelId===1||!this.action) ? Math.max(this.elapsed, this.catAt) : Infinity;
-      const next = Math.min(hourAt, timeoutAt, this.actionEnd, catAt, this.catHitAt, this.catEnd, this.cleanupEnd,this.tableEventAt(),this.tableHitAt,this.tableCatEnd);
+      const cryAt=this.pending&&this.mood==='crying'?this.cryPenaltyAt:Infinity;
+      const next = Math.min(hourAt, timeoutAt, cryAt, this.actionEnd, catAt, this.catHitAt, this.catEnd, this.cleanupEnd,this.tableEventAt(),this.tableHitAt,this.tableCatEnd);
       if (next > target) { this.elapsed = target; break; }
       this.elapsed = next;
       // На границе часа сохраняем действие; показ новой потребности ждёт его конца.
@@ -398,6 +421,7 @@ class GameModel {
         }
         this.newHour(this.hour + 1);
       } else if (next === timeoutAt) { this.fail(true); }
+      else if(next===cryAt){this.repeatCryPenalty();}
       else if(this.handleTableEvent(next)){}
       else if (next === catAt) {
         this.catState = 'running'; this.catStarted = next;
@@ -430,7 +454,7 @@ class GameModel {
       this.tableBlockedAt=this.elapsed;this.feedback=this.tableDirty?'tableBlocked':'catOnTable';return;
     }
     if (action !== this.need.action) { this.fail(false); return; }
-    this.pending = false; this.action = action; this.actionStarted = this.elapsed;
+    this.pending = false; this.cryPenaltyAt=Infinity; this.action = action; this.actionStarted = this.elapsed;
     this.actionEnd = this.elapsed + (this.levelId===3?(action==='sleep'?EXPLORER_SLEEP_MS:action==='wash'?EXPLORER_WASH_MS:RESPONSE_MS):RESPONSE_MS); this.mood = 'happy'; this.feedback = this.need.success;
     if(this.explorer){this.explorer.settle(this.elapsed);this.explorer.state='action';this.explorer.end=Infinity;}
   }
@@ -441,7 +465,18 @@ class GameModel {
     this.cleanupKind='soil';
     this.feedback = 'cleaningSoil';
   }
-  tableEventAt(){return !this.dayEnded&&this.tableCatState==='waiting'&&this.action!=='feed'?Math.max(this.elapsed,this.tableCatAt):Infinity;}
+  groundEventAt(){
+    if(this.dayEnded||this.catState!=='waiting'||this.action)return Infinity;
+    if(this.levelId===3&&this.tableCatState==='running')return Infinity;
+    const afterTable=this.levelId===3&&this.tableCatState==='gone'?this.tableCatStarted+TABLE_CAT_RUN_MS+HOUR_MS:0;
+    return Math.max(this.elapsed,this.catAt,afterTable);
+  }
+  tableEventAt(){
+    if(this.dayEnded||this.tableCatState!=='waiting'||this.action==='feed')return Infinity;
+    if(this.levelId===3&&this.catState==='running')return Infinity;
+    const afterPlant=this.levelId===3&&this.catState==='gone'?this.catStarted+CAT_RUN_MS+HOUR_MS:0;
+    return Math.max(this.elapsed,this.tableCatAt,afterPlant);
+  }
   handleTableEvent(time){
     if(!Number.isFinite(time))return false;
     if(time===this.tableEventAt()){
@@ -459,9 +494,17 @@ class GameModel {
     this.cleaning=true;this.cleanupKind='table';this.cleanupStarted=this.elapsed;this.cleanupEnd=this.elapsed+RESPONSE_MS;this.feedback='wipingTable';
   }
   completeCleanup(){
-    if(this.cleanupKind==='table')this.tableDirty=false;else this.dirty=false;
+    if(this.cleanupKind==='coffee'){this.hearts=Math.min(5,this.hearts+1);this.coffeeDrinks++;}
+    else if(this.cleanupKind==='table')this.tableDirty=false;else this.dirty=false;
     this.cleaning=false;this.cleanupEnd=Infinity;
-    if(!this.pending){this.feedback=this.cleanupKind==='table'?'tableClean':'soilClean';this.mood='';}
+    if(!this.pending){this.feedback=this.cleanupKind==='coffee'?'coffeeRestored':this.cleanupKind==='table'?'tableClean':'soilClean';this.mood='';}
+    if(this.cleanupKind==='coffee')this.feedback='coffeeRestored';
+  }
+  drinkCoffee(elapsed){
+    this.update(elapsed);
+    if(this.levelId!==3||this.status!=='playing'||this.dayEnded||this.coffeeDrinks>=2||this.hearts>=5||this.pending||this.action||this.cleaning)return;
+    this.cleaning=true;this.cleanupKind='coffee';this.cleanupStarted=this.elapsed;this.cleanupEnd=this.elapsed+RESPONSE_MS;
+    this.feedback='drinkingCoffee';
   }
 }
 // Только третий уровень: последовательный планировщик на той же шкале игровых часов.
@@ -469,7 +512,7 @@ class ExplorerDay {
   constructor(random) {
     this.random=random;this.position={...EXPLORER_START};this.from={...this.position};this.to={...this.position};
     this.state='sit';this.started=0;this.end=Infinity;this.waiting=[];this.planIndex=0;this.cabinetVisits=0;this.blocksVisits=0;this.holdAfter=0;this.blocksFellAt=-Infinity;this.blocksReturnAt=-Infinity;
-    this.closingAt=-Infinity;this.closingAngle=0;
+    this.closingAt=-Infinity;this.closingAngle=0;this.recoilAngle=0;
     const needs=[...LEVELS[3].needs];
     for(let i=needs.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[needs[i],needs[j]]=[needs[j],needs[i]];}
     this.plan=needs.map((need,i)=>({at:6000+i*17000+random()*4000,need}));
@@ -498,8 +541,8 @@ class ExplorerDay {
     if(index<0)return false;
     this.show(this.waiting.splice(index,1)[0],m);return true;
   }
-  closeDoor(time){if(this.state==='cabinetPlay'){this.closingAt=time;this.closingAngle=35+18*Math.sin((time-this.started)/150);}}
-  show(need,m){this.settle(m.elapsed);this.closeDoor(m.elapsed);this.state='need';this.end=Infinity;m.showNeed(need);m.events++;m.seenNeeds.add(need.action);if(need.action==='comfort'){m.mood='crying';m.feedback='comfortBaby';}}
+  closeDoor(time){if(this.state==='cabinetPlay'){this.closingAt=time;this.closingAngle=cabinetDoorAngle(time-this.started);}}
+  show(need,m){this.settle(m.elapsed);this.closeDoor(m.elapsed);this.state='need';this.end=Infinity;m.showNeed(need);m.events++;m.seenNeeds.add(need.action);if(need.action==='comfort'){m.mood='crying';m.cryPenaltyAt=m.elapsed+HOUR_MS;m.feedback='comfortBaby';}}
   next(m) {
     this.closeDoor(m.elapsed);
     if(this.showWaiting(m))return;
@@ -513,8 +556,9 @@ class ExplorerDay {
       const due=this.plan[this.planIndex]?.at??Infinity;
       const timeout=m.pending&&!m.timeoutApplied?m.needShownAt+RESPONSE_MS:Infinity;
       const heldNeed=!m.pending&&!m.action&&!['cabinetRecoil','blocksPlay','blocksReturn'].includes(this.state)&&this.waiting.length?Math.max(m.elapsed,this.holdAfter):Infinity;
-      const cat=m.catState==='waiting'&&!m.action?Math.max(m.elapsed,m.catAt):Infinity;
-      const next=Math.min(dayEnd,due,heldNeed,timeout,m.actionEnd,this.end,cat,m.catHitAt,m.catEnd,m.cleanupEnd,m.tableEventAt(),m.tableHitAt,m.tableCatEnd);
+      const cat=m.groundEventAt();
+      const cryAt=m.pending&&m.mood==='crying'?m.cryPenaltyAt:Infinity;
+      const next=Math.min(dayEnd,due,heldNeed,timeout,cryAt,m.actionEnd,this.end,cat,m.catHitAt,m.catEnd,m.cleanupEnd,m.tableEventAt(),m.tableHitAt,m.tableCatEnd);
       if(next>target){m.elapsed=target;m.hour=Math.min(11,Math.floor(target/HOUR_MS));break;}
       m.elapsed=next;m.hour=Math.min(11,Math.floor(next/HOUR_MS));
       if(next===dayEnd){m.endDay(target);return;}
@@ -523,6 +567,7 @@ class ExplorerDay {
         if(!m.pending&&!m.action&&this.state!=='cabinetRecoil')this.showWaiting(m);
       }else if(next===heldNeed){this.showWaiting(m);
       }else if(next===timeout)m.fail(true);
+      else if(next===cryAt)m.repeatCryPenalty();
       else if(m.handleTableEvent(next)){}
       else if(next===m.actionEnd){
         if(m.action==='comfort')this.holdAfter=next+3000;
@@ -547,7 +592,7 @@ class ExplorerDay {
         }else if(this.state==='cabinetApproach'){
           this.state='cabinetPlay';this.started=next;this.end=next+2000;m.feedback='cabinetPlay';
         }else if(this.state==='cabinetPlay'){
-          if(this.random()<.7){this.state='cabinetRecoil';this.started=next;this.end=next+250;m.mood='crying';}
+          if(this.random()<.7){this.recoilAngle=cabinetDoorAngle(next-this.started);this.state='cabinetRecoil';this.started=next;this.end=next+250;m.mood='crying';}
           else this.next(m);
         }else if(this.state==='cabinetRecoil')this.show(COMFORT_NEED,m);
       }
@@ -610,7 +655,7 @@ function render() {
   const markup = Array.from({length: 5}, (_, i) => '<span class="' + (i < model.hearts ? '' : 'lost') + '">♥</span>').join(' ');
   if (markup !== heartMarkup) { $('hearts').innerHTML = markup; heartMarkup = markup; }
   [...$('hearts').children].forEach((heart, i) => {
-    const loss = model.losses.find(loss => loss.index === i);
+    const loss = model.losses.slice().reverse().find(loss => loss.index === i);
     heart.classList.toggle('heart-hit', Boolean(loss && model.elapsed - loss.at < 650));
     heart.style.animationDelay = loss ? -(model.elapsed - loss.at) + 'ms' : '0ms';
   });
@@ -638,13 +683,13 @@ function render() {
   }
   renderCatEvent(storyVisible);
   renderTableEvent(storyVisible);
+  renderCoffee(storyVisible);
   $('thought').hidden = model.status !== 'playing' || !model.pending;
   document.querySelector('.game').classList.toggle('is-paused', story ? storyClock.paused : gameClock.paused);
   document.querySelector('.game').classList.toggle('is-stopped', !story && model.status !== 'playing');
-  const morning = story?.kind === 'intro';
-  $('pause').hidden = !morning && (Boolean(story) || model.status !== 'playing');
+  $('pause').hidden = !story && model.status !== 'playing';
   $('pause').disabled = story ? storyClock.paused : gameClock.paused;
-  $('pause-overlay').hidden = story ? !(morning && storyClock.paused && story.manualPaused) : !gameClock.paused || model.status !== 'playing';
+  $('pause-overlay').hidden = story ? !(storyClock.paused && story.manualPaused) : !gameClock.paused || model.status !== 'playing';
   $('need-icon').textContent = model.pending ? model.need.icon : '♡';
   $('need-text').textContent = model.pending ? t(model.need.text) : t('helping');
   if(model.pending&&model.need.action==='wash'&&!storyVisible){
@@ -678,15 +723,24 @@ function render() {
 // Визуальная постановка использует ТОЛЬКО существующее игровое время.
 // Встать, подойти, выполнить уход, вернуться и сесть — за те же 2000 мс.
 // Ни setTimeout, ни новых игровых состояний или изменений баланса здесь нет.
+function setCabinetAngle(cabinet,angle){
+  const radians=angle*Math.PI/180;
+  cabinet.style.setProperty('--door-angle',(-angle)+'deg');
+  cabinet.style.setProperty('--door-scale',Math.cos(radians));
+  cabinet.style.setProperty('--door-slope',Math.sin(radians)*.25);
+}
 function renderScene() {
+  document.querySelector('.explorer-bottle-front')?.setAttribute('hidden','');
   document.querySelector('.explorer-cradle-support')?.setAttribute('hidden','');
   const returnPose=document.querySelector('.explorer-return-pose');if(returnPose)returnPose.style.opacity=0;
   const idlePose=document.querySelector('.family-idle');if(idlePose)idlePose.style.opacity=0;
   document.querySelector('.family-toddler-hug').style.opacity=0;
   document.querySelector('.family-crouching').style.opacity=0;
+  document.querySelector('.family-coffee').style.opacity=0;
   if(model.levelId===3){renderExplorerScene();return;}
   $('explorer-baby').hidden=true;
-  document.querySelector('.cabinet-scene').hidden=true;
+  const cabinet=document.querySelector('.cabinet-scene');cabinet.hidden=false;
+  setCabinetAngle(cabinet,0);cabinet.querySelector('.cabinet-interior').hidden=false;
   const blocks=document.querySelector('.explorer-blocks');if(blocks)blocks.hidden=true;
   document.querySelector('.room').dataset.blocksPlaying='false';
   const floor=document.querySelector('.blocks-underlay');if(floor)floor.hidden=true;
@@ -767,6 +821,7 @@ function renderScene() {
   const behindFurniture = inFurniture;
   baby.style.zIndex = behindFurniture ? 5 : 8;
   baby.dataset.depth = behindFurniture ? 'inside' : 'held';
+  baby.style.clipPath = inFurniture && model.action === 'wash' ? 'inset(0 0 44% 0)' : '';
   baby.style.setProperty('--care', care);
   baby.style.setProperty('--action-time', -age + 'ms');
   baby.querySelector('img').style.transform = 'rotate(' + (inFurniture ? (model.action === 'sleep' ? 40 : Math.sin(age / 85) * 3) : 0) + 'deg) scaleX(' + mirror + ')';
@@ -876,10 +931,11 @@ function renderExplorerScene() {
   let mx=43,my=25,mother=idle,rotation=0,mirror=-1,scaleY=1.52,momOpacity=1,babyRotation=0,depth=8,feeding=false,cradle=0,placement=0,carePose=0,returnPose=0,hugWeight=0;
   let x=(p.x-.09)*100,y=(p.y-room.clientWidth*.18*1.1/room.clientHeight*.93)*100,width=18;
   let door=e.closingAngle*(1-ease((time-e.closingAt)/200));
-  if(e.state==='cabinetPlay')door=35+18*Math.sin(age/150);
-  if(e.state==='cabinetRecoil')door=35*(1-ease(age/150));
-  const cabinet=document.querySelector('.cabinet-scene');cabinet.hidden=door<=0;
-  cabinet.style.setProperty('--door-angle',(-door)+'deg');
+  if(e.state==='cabinetPlay')door=cabinetDoorAngle(age);
+  if(e.state==='cabinetRecoil')door=e.recoilAngle*(1-ease(age/150));
+  const cabinet=document.querySelector('.cabinet-scene');cabinet.hidden=false;
+  cabinet.querySelector('.cabinet-interior').hidden=false;
+  setCabinetAngle(cabinet,door);
   if(model.action){
     mother=empty;
     const a=actionAge,approach=ease(a/350),returning=ease((a-1650)/350);
@@ -905,16 +961,16 @@ function renderExplorerScene() {
       x=mix(x,mx+22.5,lift);y=mix(y,my-4,lift);babyRotation=-12*lift;
       // Одна и та же фигура плавно переходит из рук на матрас/в раковину.
       x=mix(x,sleep?CRIB_BABY.x*100+5:1.5,placement);
-      y=mix(y,sleep?CRIB_BABY.y*100:24,placement);
-      babyRotation=mix(babyRotation,sleep?-90:-20,placement);
+      y=mix(y,sleep?CRIB_BABY.y*100:22.5,placement);
+      babyRotation=mix(babyRotation,sleep?-90:-6,placement);
       carePose=ease((a-650)/200)*(1-ease((a-1450)/300));
       returnPose=returning;
       if(a<850){
           const pickup=ease((a-150)/300),toObject=ease((a-650)/200),transfer=ease((a-450)/200);
           hugWeight=pickup*(1-toObject);cradle=0;
           x=mix((p.x-.09)*100,sleep?CRIB_BABY.x*100+5:1.5,transfer);
-          y=mix((p.y-room.clientWidth*.18*1.1/room.clientHeight*.93)*100,sleep?CRIB_BABY.y*100:24,transfer);
-          babyRotation=(sleep?-90:-20)*transfer;placement=transfer;
+          y=mix((p.y-room.clientWidth*.18*1.1/room.clientHeight*.93)*100,sleep?CRIB_BABY.y*100:22.5,transfer);
+          babyRotation=(sleep?-90:-6)*transfer;placement=transfer;
           pose=a<650?'cradled':'settled-care';
       }
       if(!sleep){
@@ -923,9 +979,12 @@ function renderExplorerScene() {
           const liftBack=ease((a-1450)/250),lower=ease((a-1700)/300),transfer=ease((a-1600)/100);
           const floorX=(EXPLORER_WASH_LANDING.x-.09)*100;
           const floorY=(EXPLORER_WASH_LANDING.y-room.clientWidth*.18*1.1/room.clientHeight*.93)*100;
-          x=mix(1.5,floorX,transfer);y=mix(24,floorY,transfer);
-          babyRotation=mix(-20,0,transfer);placement=1-transfer;
-          hugWeight=liftBack*(1-lower);carePose=1-liftBack;
+          x=a<1700?1.5:floorX;
+          y=a<1700?22.5:floorY;
+          babyRotation=a<1700?-6:0;placement=a<1700?1:0;
+          // Сначала берём малыша у чаши цельной позой, затем отходим вместе.
+          const take=ease((a-1450)/100);
+          hugWeight=take*(1-lower);carePose=1-take;
           cradle=0;pose=a<1700?'cradled':'lowering';returnPose=0;
         }
       }else if(a>=1450){
@@ -944,8 +1003,9 @@ function renderExplorerScene() {
         cradle=0;pose=a>=1850?'lowering':'settled-care';returnPose=0;
       }
       if(placement>.5)depth=5;
+      if(!sleep&&a>=650&&a<1700)depth=8;
       face=sleep&&placement>.95?'sleep':'happy';
-      room.dataset.care=sleep?'sleep':'wash';room.style.setProperty('--scene-care',placement);
+      room.dataset.care=sleep?'sleep':'wash';room.style.setProperty('--scene-care',sleep?placement:placement*carePose);
     }
   }
   if(model.cleaning){
@@ -953,6 +1013,10 @@ function renderExplorerScene() {
     mx=mix(43,40,t);my=26;rotation=-22*t;scaleY=1.52-.22*t;
     if(model.cleanupKind==='table'){mx=mix(43,-20,t);my=mix(25,46,t);mirror=1;rotation=40*t;}
     if(a>=1600){momOpacity=1-ease((a-1600)/200);if(a>=1800){mother=empty;mx=43;my=25;rotation=0;scaleY=1.52;momOpacity=ease((a-1800)/200);}}
+    if(model.cleanupKind==='coffee'){
+      const travel=ease(a/400)*(1-ease((a-1600)/400));
+      mother=family.querySelector('.family-coffee');mx=mix(43,-2,travel);my=mix(25,42,travel);rotation=0;scaleY=1.52;momOpacity=1;
+    }
   }
   family.style.left=mx+'%';family.style.top=my+'%';
   const momFeet=my/100+family.clientHeight*.96/room.clientHeight;
@@ -961,6 +1025,10 @@ function renderExplorerScene() {
   // У стола мама наклоняется далеко за пределы обычного силуэта стоящей позы.
   if(!model.action&&model.cleaning&&model.cleanupKind==='table')depth=6;
   mother.style.opacity=momOpacity;mother.style.scale='1';mother.style.transform='rotate('+rotation+'deg) scale('+(1.52*mirror)+','+scaleY+')';
+  if(model.cleaning&&model.cleanupKind==='coffee'){
+    const a=time-model.cleanupStarted,pose=ease((a-250)/200)*(1-ease((a-1550)/200));
+    mother.style.opacity=pose;idle.style.opacity=1-pose;idle.style.transform='scale(-1.52,1.52)';
+  }
   let resting=family.querySelector('.explorer-return-pose');
   if(!resting){resting=idle.cloneNode(false);resting.className='family-empty explorer-return-pose';family.querySelector('.family-visual').append(resting);}
   if(model.action==='wash'||model.action==='sleep'){
@@ -1003,6 +1071,8 @@ function renderExplorerScene() {
   if(washReturn){
     empty.style.opacity=0;resting.style.opacity=0;
     idle.style.opacity=ease((actionAge-1700)/300);hug.style.opacity=hugWeight;
+    // Объятие обращено к чаше: малыш остаётся с той же стороны мамы.
+    hug.style.transform='scale(-1.52,1.52)';
   }
   const sleepReturn=model.action==='sleep'&&actionAge>=1450;
   if(sleepReturn){
@@ -1022,7 +1092,7 @@ function renderExplorerScene() {
   room.style.setProperty('--scene-age',-time+'ms');
   baby.hidden=false;baby.style.opacity=1-hugWeight;baby.disabled=!model.pending||Boolean(model.action)||model.cleaning||gameClock.paused||model.status!=='playing';
   if(carePickup)baby.style.opacity=actionAge<650?1-ease((actionAge-150)/300):ease((actionAge-650)/200);
-  if(washReturn)baby.style.opacity=actionAge<1700?1-ease((actionAge-1450)/250):ease((actionAge-1700)/300);
+  if(washReturn)baby.style.opacity=actionAge<1700?1-ease((actionAge-1450)/100):ease((actionAge-1700)/300);
   if(sleepReturn)baby.style.opacity=actionAge<1750?1-ease((actionAge-1600)/150):ease((actionAge-1850)/150);
   baby.dataset.pose=pose;baby.dataset.face=face;
   // Увеличиваем только малыша третьего уровня, сохраняя опору на пол/матрас.
@@ -1035,8 +1105,15 @@ function renderExplorerScene() {
     // Малыш подаётся корпусом вслед за дверцей; рука сохраняет исходные пропорции.
     x=edge/room.clientWidth*100-width*112/512;
   }
+  const needsComfort=model.pending&&['hold','comfort'].includes(model.need?.action)&&!model.action;
+  baby.dataset.needsComfort=String(needsComfort);
+  if(needsComfort)depth=11;
   baby.style.left=x+'%';baby.style.top=y+'%';baby.style.width=width+'%';baby.style.zIndex=depth;
   baby.style.transform='rotate('+babyRotation+'deg)';
+  // В чаше нижняя часть тела скрыта водой и передним краем раковины.
+  // При подъёме маска уходит вместе с размещением малыша в чаше.
+  const bathMask=placement;
+  baby.style.clipPath=model.action==='wash'?'inset(0 0 '+(36*bathMask)+'% 0)':'';
   const svg=baby.querySelector('svg'),direction=pose==='crawl'&&e.to.x>e.from.x?-1:1;
   svg.style.transform='scaleX('+direction+')';
   if(pose==='reach'){
@@ -1076,6 +1153,14 @@ function renderExplorerScene() {
   baby.querySelector('.explorer-face').setAttribute('transform','translate('+(-12*looking)+' 0) translate(100 65) scale('+(1-.18*looking)+' 1) translate(-100 -65)');
   baby.querySelector('.explorer-tears').style.transform='translateY('+((time%650)/650*8)+'px)';
   baby.querySelector('.explorer-bottle').hidden=!feeding;
+  let frontBottle=room.querySelector('.explorer-bottle-front');
+  if(!frontBottle){
+    frontBottle=document.createElement('div');frontBottle.className='explorer-bottle-front';frontBottle.setAttribute('aria-hidden','true');
+    const image=baby.querySelector('.explorer-bottle').cloneNode(false);image.className='';image.hidden=false;frontBottle.append(image);room.append(frontBottle);
+  }
+  frontBottle.hidden=!feeding;
+  frontBottle.style.left=baby.style.left;frontBottle.style.top=baby.style.top;frontBottle.style.width=baby.style.width;frontBottle.style.transform=baby.style.transform;
+  baby.querySelector('.explorer-bottle').style.opacity=feeding?0:1;
   baby.querySelector('.explorer-zzz').hidden=face!=='sleep'||!model.action;
   baby.querySelector('.touch-marker').hidden=!model.pending||!['hold','comfort'].includes(model.need?.action)||Boolean(model.action);
   const spriteDirection=pose==='crawl'?(e.to.x<e.from.x?-1:1):pose==='up'&&p.x>.6?-1:1;
@@ -1109,7 +1194,7 @@ function renderExplorerBlocks(e,time){
   if(!root){
     root=document.createElementNS('http://www.w3.org/2000/svg','svg');
     root.setAttribute('class','explorer-blocks');root.setAttribute('viewBox','0 0 1024 1211');root.setAttribute('aria-hidden','true');
-    root.innerHTML='<defs><clipPath id="moving-mint-cube"><path d="M-37 -20L-2 -32L32 -21L33 22L0 33L-37 24Z"/></clipPath></defs><g class="stack-cube" opacity="0"></g><g class="lift-cube"><g clip-path="url(#moving-mint-cube)"><use href="#room-plate" transform="translate(-749 -991)"/></g></g>';
+    root.innerHTML='<defs><clipPath id="moving-mint-cube"><path d="M-9 -35.5Q-5 -37 2 -34L27 -28.5Q32.5 -27 32.5 -18L32.5 12Q32.5 17.5 28 20L6 30Q0 32 -7 29.5L-31 23Q-36.5 21.5 -36.5 15L-36.5 -17Q-36.5 -23 -29 -26.5Z"/></clipPath></defs><g class="stack-cube" opacity="0"></g><g class="lift-cube"><g clip-path="url(#moving-mint-cube)"><use href="#room-plate" transform="translate(-749 -991)"/></g></g>';
     document.querySelector('.room').append(root);
   }
   const carryingBack=e.state==='blocksReturn',playing=activeBlocks,fall=time-e.blocksFellAt,returnAge=time-e.blocksReturnAt;
@@ -1139,11 +1224,11 @@ function renderExplorerBlocks(e,time){
   root.querySelector('.stack-cube').style.opacity=0;
   root.querySelector('.stack-cube').setAttribute('transform','translate('+(785+70*drop)+' '+(930+45*drop)+') rotate('+(80*drop)+')');
   
-  root.querySelector('.lift-cube').setAttribute('transform',playing?'translate('+(749+(786-749)*second)+' '+(991+(884-991)*second-Math.sin(second*Math.PI)*6)+')':'translate('+(786-46*drop)+' '+(884+101*drop)+') rotate('+(-95*drop)+')');
+  root.querySelector('.lift-cube').setAttribute('transform',playing?'translate('+(749+(786-749)*second)+' '+(991+(884-991)*second-Math.sin(second*Math.PI)*6)+')':'translate('+(786-46*drop)+' '+(888+97*drop)+') rotate('+(-95*drop)+')');
   const lifted=root.querySelector('.lift-cube');lifted.style.opacity=1;
   if(returning){
     const t=smooth(returnAge/350),afterFall=Number.isFinite(e.blocksFellAt)&&e.blocksFellAt<=e.blocksReturnAt;
-    const fromX=afterFall?740:786,fromY=afterFall?985:884;
+    const fromX=afterFall?740:786,fromY=afterFall?985:888;
     lifted.setAttribute('transform','translate('+(fromX+(749-fromX)*t)+' '+(fromY+(991-fromY)*t)+') rotate('+((afterFall?-95:0)*(1-t))+')');
   }
   if(playing){
@@ -1171,7 +1256,7 @@ function renderCatEvent(storyVisible) {
   root.hidden = !visible;
   document.querySelector('.plant-patch').toggleAttribute('hidden', !visible);
   room.dataset.cleaning = String(interactive && model.cleaning);
-  room.dataset.tableCleaning = String(interactive && model.cleaning && model.cleanupKind==='table');
+  room.dataset.tableCleaning = String(interactive && model.cleaning && ['table','coffee'].includes(model.cleanupKind));
   room.dataset.cleanupCrying = String(model.cleaning && model.mood === 'crying');
   document.querySelectorAll('.cleanup-tears i').forEach((tear, i) => {
     const phase = ((model.elapsed / 650) + i * .5) % 1;
@@ -1240,6 +1325,20 @@ function renderTableEvent(storyVisible){
   hand.toggleAttribute('hidden',!active||!wiping);
   hand.style.opacity=Math.max(0,Math.min(1,(wipeAge-250)/150,(1800-wipeAge)/150));
   hand.style.left=(21+1.5*Math.sin(wipeAge/110))+'%';hand.style.transform='rotate('+(2*Math.sin(wipeAge/140))+'deg)';
+}
+
+function renderCoffee(storyVisible){
+  const cup=$('coffee'),drinking=model.cleaning&&model.cleanupKind==='coffee',empty=model.coffeeDrinks>=2;
+  cup.dataset.empty=String(empty);
+  cup.setAttribute('data-i18n-aria',empty?'coffeeEmpty':'coffee');
+  cup.setAttribute('aria-label',t(empty?'coffeeEmpty':'coffee'));
+  cup.querySelector('.coffee-liquid').setAttribute('fill',empty?'#e5d5c2':'#76503b');
+  cup.hidden=model.levelId!==3||(model.status==='ready'&&!storyVisible);
+  cup.disabled=Boolean(storyVisible)||model.status!=='playing'||model.dayEnded||empty||gameClock.paused||model.hearts>=5||model.pending||Boolean(model.action)||model.cleaning;
+  cup.querySelector('.touch-marker').hidden=cup.disabled;
+  const age=model.elapsed-model.cleanupStarted,ease=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
+  cup.querySelector('svg').style.opacity=drinking?1-ease((age-250)/200)*(1-ease((age-1550)/200)):1;
+  cup.querySelector('.coffee-steam').style.opacity=empty?0:.55+.25*Math.sin(model.elapsed/500);
 }
 
 
@@ -1355,7 +1454,7 @@ function pauseStory(manual = false) {
     $('confirm-restart').hidden = true; $('pause-menu').hidden = false;
   }
   storyClock.pause(); stopFrame(); render();
-  if (manual === true && story.kind === 'intro') $('resume').focus();
+  if (manual === true) $('resume').focus();
 }
 function resumeStory(manual = false) {
   if (!story || !storyClock.paused || document.hidden || !document.hasFocus()) return;
@@ -1369,8 +1468,11 @@ function storyFeedback(kind, age) {
     age < 450 ? 'storyMorning' : age < 1600 ? 'storyKiss' : age < 2700 ? 'storyWave' : 'storyLeave';
 }
 function renderStoryScene(kind, elapsed) {
+  document.querySelector('.explorer-bottle-front')?.setAttribute('hidden','');
   document.querySelector('.explorer-cradle-support')?.setAttribute('hidden','');
-  $('explorer-baby').hidden=true;document.querySelector('.cabinet-scene').hidden=true;
+  $('explorer-baby').hidden=true;
+  const cabinet=document.querySelector('.cabinet-scene');cabinet.hidden=false;
+  setCabinetAngle(cabinet,0);cabinet.querySelector('.cabinet-interior').hidden=false;
   const age = Math.min(STORY_MS, elapsed) * 4000 / STORY_MS;
   const ease = x => {x = Math.max(0, Math.min(1, x)); return x*x*(3-2*x);};
   const family = $('family'), room = document.querySelector('.room'), dad = $('dad');
@@ -1525,7 +1627,7 @@ function returnToTitle() {
   render(); $('start').focus();
 }
 function resume() {
-  if (story?.kind === 'intro') {
+  if (story) {
     if (!$('confirm-restart').hidden) return;
     resumeStory(true); $('pause').focus(); return;
   }
@@ -1544,6 +1646,10 @@ $('wipe-table').addEventListener('click',()=>{
   if(gameClock.paused||model.status!=='playing'||story)return;
   model.wipeTable(elapsedNow());render();
 });
+$('coffee').addEventListener('click',()=>{
+  if(gameClock.paused||model.status!=='playing'||story)return;
+  model.drinkCoffee(elapsedNow());render();
+});
 $('explorer-baby').addEventListener('click',()=>{
   if(model.levelId!==3||gameClock.paused||model.status!=='playing')return;
   model.answer(model.need?.action==='comfort'?'comfort':'hold',elapsedNow());render();
@@ -1560,21 +1666,21 @@ $('pause').addEventListener('click', () => pause(true));
 $('resume').addEventListener('click', resume);
 $('main-menu').addEventListener('click', returnToTitle);
 $('restart').addEventListener('click', () => {
-  if (story ? !(story.kind === 'intro' && storyClock.paused) : !gameClock.paused || model.status !== 'playing') return;
+  if (story ? !storyClock.paused : !gameClock.paused || model.status !== 'playing') return;
   $('pause-menu').hidden = true; $('confirm-restart').hidden = false; $('cancel-restart').focus();
 });
 $('cancel-restart').addEventListener('click', () => {
   $('confirm-restart').hidden = true; $('pause-menu').hidden = false; $('restart').focus();
 });
 $('confirm-start').addEventListener('click', () => {
-  if ((story ? story.kind === 'intro' && storyClock.paused : gameClock.paused && model.status === 'playing') && !$('confirm-restart').hidden) start();
+  if ((story ? storyClock.paused : gameClock.paused && model.status === 'playing') && !$('confirm-restart').hidden) start();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); else resumeStory(); syncMusic(); });
 window.addEventListener('blur', pause);
 window.addEventListener('pagehide', pause);
 window.addEventListener('focus', resumeStory);
 document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || (model.status !== 'playing' && story?.kind !== 'intro')) return;
+  if (event.key !== 'Escape' || (model.status !== 'playing' && !story)) return;
   if (!(story ? storyClock.paused : gameClock.paused)) pause(true);
   else if (!$('confirm-restart').hidden) $('cancel-restart').click();
   else resume();
